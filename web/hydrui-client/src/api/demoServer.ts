@@ -1289,6 +1289,7 @@ Attribution: (c) copyright Blender Foundation | www.bigbuckbunny.org
   private async deleteFiles(body: Blob) {
     const request: DeleteFilesRequest = JSON.parse(await body.text());
     for (const file of this.fileMetadata(request)) {
+      file.is_trashed = true;
       file.is_deleted = true;
     }
     return emptyResponse();
@@ -1297,6 +1298,7 @@ Attribution: (c) copyright Blender Foundation | www.bigbuckbunny.org
   private async undeleteFiles(body: Blob) {
     const request: UndeleteFilesRequest = JSON.parse(await body.text());
     for (const file of this.fileMetadata(request)) {
+      file.is_trashed = false;
       file.is_deleted = false;
     }
     return emptyResponse();

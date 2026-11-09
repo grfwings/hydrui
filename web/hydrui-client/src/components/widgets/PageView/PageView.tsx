@@ -9,6 +9,7 @@ import {
   ChevronUpIcon,
   DocumentIcon,
   ExclamationCircleIcon,
+  FunnelIcon,
   LinkIcon,
   MagnifyingGlassIcon,
   MinusCircleIcon,
@@ -31,6 +32,7 @@ import React, {
 import { ErrorBoundary } from "react-error-boundary";
 
 import { FileMetadata } from "@/api/types";
+import ArchiveDeleteFilterModal from "@/components/modals/ArchiveDeleteFilterModal/ArchiveDeleteFilterModal";
 import BatchAutoTagModal from "@/components/modals/BatchAutoTagModal/BatchAutoTagModal";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import EditNotesModal from "@/components/modals/EditNotesModal/EditNotesModal";
@@ -141,6 +143,10 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
   const [showExpressionFilterModal, setShowExpressionFilterModal] =
     useState(false);
   const [showExpressionSortModal, setShowExpressionSortModal] = useState(false);
+  const [showArchiveDeleteFilter, setShowArchiveDeleteFilter] = useState(false);
+  const [archiveDeleteFilterFiles, setArchiveDeleteFilterFiles] = useState<
+    FileMetadata[]
+  >([]);
   const [tagEditFiles, setTagEditFiles] = useState<FileMetadata[]>([]);
   const [urlEditFiles, setUrlEditFiles] = useState<FileMetadata[]>([]);
   const [batchAutotagFiles, setBatchAutotagFiles] = useState<FileMetadata[]>(
@@ -158,7 +164,8 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     showBatchAutotagModal ||
     showConfirmDeleteModal ||
     showExpressionFilterModal ||
-    showExpressionSortModal;
+    showExpressionSortModal ||
+    showArchiveDeleteFilter;
   const [renderView, setRenderView] = useState({
     firstIndex: 0,
     lastIndex: fileIds.length,
@@ -240,6 +247,48 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     [addToast, undeleteFiles],
   );
 
+  const launchArchiveDeleteFilter = useCallback(async () => {
+    const candidateFileIds = selectedFiles.length > 0 ? selectedFiles : fileIds;
+    if (candidateFileIds.length === 0) {
+      return;
+    }
+
+    const candidateFileIdSet = new Set(candidateFileIds);
+    const orderedFileIds = fileIds.filter((fileId) =>
+      candidateFileIdSet.has(fileId),
+    );
+
+    try {
+      const metadata = metadataLoadController
+        ? await metadataLoadController.demandFetchMetadata(orderedFileIds)
+        : loadedFiles.filter((file) => candidateFileIdSet.has(file.file_id));
+      const metadataById = new Map(
+        metadata.map((file) => [file.file_id, file]),
+      );
+      const files = orderedFileIds
+        .map((fileId) => metadataById.get(fileId))
+        .filter((file): file is FileMetadata => file !== undefined)
+        .filter((file) => file.is_local === true && !file.is_trashed);
+
+      if (files.length === 0) {
+        return;
+      }
+
+      setArchiveDeleteFilterFiles(files);
+      setShowArchiveDeleteFilter(true);
+    } catch (e) {
+      if (e instanceof Error && e.message === "Canceled") {
+        return;
+      }
+      addToast(`Error preparing Archive/Delete filter: ${e}`, "error");
+    }
+  }, [addToast, fileIds, loadedFiles, metadataLoadController, selectedFiles]);
+
+  const closeArchiveDeleteFilter = useCallback(() => {
+    setShowArchiveDeleteFilter(false);
+    setArchiveDeleteFilterFiles([]);
+  }, []);
+
   const selectAllFiles = useCallback(() => {
     const { fileIds } = usePageStore.getState();
     setSelectedFiles(pageKey, fileIds);
@@ -315,6 +364,12 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       id: "select-all",
       label: "Select All",
       onClick: selectAllFiles,
+    },
+    {
+      id: "archive-delete-filter",
+      label: "Archive/Delete Filter",
+      icon: <FunnelIcon />,
+      onClick: launchArchiveDeleteFilter,
     },
     {
       id: "divider5",
@@ -1930,6 +1985,13 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       {showExpressionSortModal && (
         <ExpressionSortModal
           onClose={() => setShowExpressionSortModal(false)}
+        />
+      )}
+
+      {showArchiveDeleteFilter && archiveDeleteFilterFiles.length > 0 && (
+        <ArchiveDeleteFilterModal
+          files={archiveDeleteFilterFiles}
+          onClose={closeArchiveDeleteFilter}
         />
       )}
     </div>

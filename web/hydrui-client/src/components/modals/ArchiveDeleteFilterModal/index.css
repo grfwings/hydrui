@@ -1,0 +1,146 @@
+.archive-delete-filter-container {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(0, 0, 0, 0.95);
+  color: var(--color-white);
+}
+
+.archive-delete-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-gray-900);
+  border-bottom: 1px solid var(--color-gray-700);
+}
+
+.archive-delete-filter-progress {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.archive-delete-filter-counts {
+  display: flex;
+  gap: 1rem;
+  font-size: var(--text-sm);
+}
+
+.archive-delete-filter-kept {
+  color: var(--color-green-400);
+}
+
+.archive-delete-filter-deleted {
+  color: var(--color-red-400);
+}
+
+.archive-delete-filter-skipped {
+  color: var(--color-gray-400);
+}
+
+.archive-delete-filter-viewer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.archive-delete-filter-empty {
+  color: var(--color-gray-400);
+}
+
+.archive-delete-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: var(--color-gray-900);
+  border-top: 1px solid var(--color-gray-700);
+}
+
+.archive-delete-filter-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.archive-delete-filter-shortcut {
+  padding: 0.125rem 0.375rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.archive-delete-commit-dialog-container {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.archive-delete-commit-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.archive-delete-commit-dialog-content {
+  position: relative;
+  width: 100%;
+  max-width: var(--container-md);
+  background-color: var(--color-gray-800);
+  border-radius: var(--radius-lg);
+}
+
+.archive-delete-commit-dialog-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-gray-700);
+}
+
+.archive-delete-commit-dialog-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.archive-delete-commit-dialog-body {
+  padding: 1rem;
+}
+
+.archive-delete-commit-dialog-message {
+  color: var(--color-gray-300);
+}
+
+.archive-delete-commit-dialog-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  color: var(--color-gray-300);
+  font-size: var(--text-sm);
+}
+
+.archive-delete-commit-dialog-error {
+  margin-top: 0.75rem;
+  color: var(--color-red-400);
+  font-size: var(--text-sm);
+}
+
+.archive-delete-commit-dialog-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--color-gray-700);
+}

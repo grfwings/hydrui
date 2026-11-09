@@ -413,7 +413,9 @@ export type ArchiveFilesRequest = FilesParam;
 
 export type UnarchiveFilesRequest = FilesParam;
 
-export interface DeleteFilesRequest extends FilesParam, FileDomainParam {}
+export interface DeleteFilesRequest extends FilesParam, FileDomainParam {
+  reason?: string;
+}
 
 export interface UndeleteFilesRequest extends FilesParam, FileDomainParam {}
 
