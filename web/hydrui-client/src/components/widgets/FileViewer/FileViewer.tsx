@@ -44,6 +44,10 @@ export interface FileViewerProps {
   // A callback to report whether annotation edits have not been saved.
   onAnnotationDirtyChange?: (dirty: boolean) => void;
 
+  // Reports when a zoomable viewer enters or leaves its zoomed state, so a
+  // parent can stand down gestures that would conflict with panning.
+  onMediaZoomChange?: ((zoomed: boolean) => void) | undefined;
+
   navigateLeft?: (() => void) | undefined;
   navigateRight?: (() => void) | undefined;
 }
@@ -58,6 +62,7 @@ const FileViewerImpl: React.FC<FileViewerProps> = ({
   showAnnotations = false,
   onUpdateAnnotationState,
   onAnnotationDirtyChange,
+  onMediaZoomChange,
   navigateLeft,
   navigateRight,
 }) => {
@@ -91,6 +96,7 @@ const FileViewerImpl: React.FC<FileViewerProps> = ({
         showAnnotations={showAnnotations}
         onUpdateAnnotationState={onUpdateAnnotationState}
         onAnnotationDirtyChange={onAnnotationDirtyChange}
+        onZoomChange={onMediaZoomChange}
         navigateLeft={navigateLeft}
         navigateRight={navigateRight}
       />

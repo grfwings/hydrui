@@ -191,12 +191,12 @@ const EditUrlsModal: React.FC<EditUrlsModalProps> = ({ files, onClose }) => {
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="edit-urls-modal-container">
-        <div className="edit-urls-modal-wrapper">
+        <div className="edit-urls-modal-wrapper modal-shell modal-full">
           <div className="edit-urls-modal-backdrop" onClick={handleClose} />
 
-          <div className="edit-urls-modal-content">
+          <div className="edit-urls-modal-content modal-panel">
             {/* Header */}
-            <div className="edit-urls-modal-header">
+            <div className="edit-urls-modal-header modal-panel-head">
               <h2 className="edit-urls-modal-title">
                 Edit URLs ({files.length} file{files.length !== 1 ? "s" : ""})
               </h2>
@@ -208,14 +208,15 @@ const EditUrlsModal: React.FC<EditUrlsModalProps> = ({ files, onClose }) => {
                     onClose();
                   }
                 }}
-                className="edit-urls-modal-close-button"
+                className="edit-urls-modal-close-button modal-close"
+                aria-label="Close"
               >
                 <XMarkIcon className="edit-urls-modal-close-icon" />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="edit-urls-modal-tabs">
+            <div className="edit-urls-modal-tabs modal-panel-tabs">
               <div className="edit-urls-modal-tabs-list">
                 <button
                   onClick={() => setActiveTab("edit")}
@@ -241,7 +242,7 @@ const EditUrlsModal: React.FC<EditUrlsModalProps> = ({ files, onClose }) => {
             </div>
 
             {/* Content */}
-            <div className="edit-urls-modal-content-area">
+            <div className="edit-urls-modal-content-area modal-panel-scroll">
               {activeTab === "edit" ? (
                 <>
                   {/* URL input */}
@@ -253,6 +254,11 @@ const EditUrlsModal: React.FC<EditUrlsModalProps> = ({ files, onClose }) => {
                       className="edit-urls-modal-url-input"
                       disabled={isSubmitting}
                       onKeyDown={handleInputKeyDown}
+                      inputMode="url"
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      enterKeyHint="go"
                     />
                   </div>
                   {/* URL list */}
@@ -379,7 +385,7 @@ const EditUrlsModal: React.FC<EditUrlsModalProps> = ({ files, onClose }) => {
             </div>
 
             {/* Footer */}
-            <div className="edit-urls-modal-footer">
+            <div className="edit-urls-modal-footer modal-panel-foot">
               <div className="edit-urls-modal-footer-content">
                 {error ? (
                   <div className="edit-urls-modal-error">{error}</div>

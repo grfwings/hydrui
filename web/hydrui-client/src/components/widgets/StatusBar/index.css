@@ -83,6 +83,30 @@
   color: var(--color-gray-100);
 }
 
+.status-bar-compact {
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+@media (pointer: coarse) {
+  .status-bar-pause-button,
+  .status-bar-cancel-button {
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .status-bar-pause-button {
+    margin-left: -0.5rem;
+  }
+
+  .status-bar-cancel-button {
+    margin-left: 0;
+  }
+}
+
 .status-bar-pause-icon {
   height: 1rem;
   width: 1rem;

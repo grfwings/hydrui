@@ -97,6 +97,10 @@ const ProviderTranscriptionOptions: React.FC<
           }
           disabled={!value.overrideReasoningEffort}
           placeholder="Provider value"
+          autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
         />
       </div>
 
@@ -123,6 +127,9 @@ const ProviderTranscriptionOptions: React.FC<
             disabled={!value.includeAdditionalParameters}
             aria-invalid={!parametersValid}
             spellCheck={false}
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
           />
           {!parametersValid && (
             <span className="provider-transcription-options-error">

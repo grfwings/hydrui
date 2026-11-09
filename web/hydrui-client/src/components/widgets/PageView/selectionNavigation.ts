@@ -13,6 +13,8 @@ interface SelectionGeometry {
   columns: number;
   itemSize: number;
   gapSize: number;
+  /** Grid padding before the first row/column. Defaults to `gapSize`. */
+  paddingSize?: number;
 }
 
 interface SelectionViewport extends SelectionGeometry {
@@ -112,9 +114,10 @@ const getItemBounds = (
   columns: number,
   itemSize: number,
   gapSize: number,
+  paddingSize: number,
 ) => {
   const row = Math.floor(index / Math.max(1, columns));
-  const top = gapSize + row * (itemSize + gapSize);
+  const top = paddingSize + row * (itemSize + gapSize);
   return { top, bottom: top + itemSize };
 };
 
@@ -123,6 +126,7 @@ export function getSelectionOverflow({
   columns,
   itemSize,
   gapSize,
+  paddingSize = gapSize,
   scrollTop,
   viewportHeight,
 }: SelectionViewport): SelectionOverflow {
@@ -131,8 +135,8 @@ export function getSelectionOverflow({
   const viewportBottom = scrollTop + viewportHeight;
 
   const firstRowNotAbove =
-    Math.floor((scrollTop - gapSize - itemSize) / rowSize) + 1;
-  const firstRowBelow = Math.ceil((viewportBottom - gapSize) / rowSize);
+    Math.floor((scrollTop - paddingSize - itemSize) / rowSize) + 1;
+  const firstRowBelow = Math.ceil((viewportBottom - paddingSize) / rowSize);
   const above = lowerBound(
     selectionIndex,
     Math.max(0, firstRowNotAbove) * safeColumns,
@@ -155,17 +159,19 @@ export function getSelectionScrollTarget(
   const index = geometry.selectionIndex.at(
     edge === "top" ? 0 : geometry.selectionIndex.length - 1,
   );
+  const paddingSize = geometry.paddingSize ?? geometry.gapSize;
   const bounds = getItemBounds(
     index,
     geometry.columns,
     geometry.itemSize,
     geometry.gapSize,
+    paddingSize,
   );
 
   return Math.max(
     0,
     edge === "top"
-      ? bounds.top - geometry.gapSize
+      ? bounds.top - paddingSize
       : bounds.bottom + geometry.gapSize - viewportHeight,
   );
 }

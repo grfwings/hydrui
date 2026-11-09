@@ -205,23 +205,24 @@ const EditNotesModal: React.FC<EditNotesModalProps> = ({ file, onClose }) => {
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="edit-notes-modal-container">
-        <div className="edit-notes-modal-wrapper">
+        <div className="edit-notes-modal-wrapper modal-shell modal-full">
           <div className="edit-notes-modal-backdrop" onClick={handleClose} />
 
-          <div className="edit-notes-modal-content">
+          <div className="edit-notes-modal-content modal-panel">
             {/* Header */}
-            <div className="edit-notes-modal-header">
+            <div className="edit-notes-modal-header modal-panel-head">
               <h2 className="edit-notes-modal-title">Edit Notes</h2>
               <button
                 onClick={handleClose}
-                className="edit-notes-modal-close-button"
+                className="edit-notes-modal-close-button modal-close"
+                aria-label="Close"
               >
                 <XMarkIcon className="edit-notes-modal-close-icon" />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="edit-notes-modal-tabs">
+            <div className="edit-notes-modal-tabs modal-panel-tabs">
               <div className="edit-notes-modal-tabs-list">
                 <button
                   onClick={() => setActiveTab("edit")}
@@ -247,7 +248,7 @@ const EditNotesModal: React.FC<EditNotesModalProps> = ({ file, onClose }) => {
             </div>
 
             {/* Content */}
-            <div className="edit-notes-modal-content-area">
+            <div className="edit-notes-modal-content-area modal-panel-scroll">
               {activeTab === "edit" ? (
                 <>
                   {/* Note name input */}
@@ -259,6 +260,10 @@ const EditNotesModal: React.FC<EditNotesModalProps> = ({ file, onClose }) => {
                       className="edit-notes-modal-name-input"
                       disabled={isSubmitting}
                       onKeyDown={handleInputKeyDown}
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      enterKeyHint="go"
                     />
                   </div>
                   {/* Note list */}
@@ -377,7 +382,7 @@ const EditNotesModal: React.FC<EditNotesModalProps> = ({ file, onClose }) => {
             </div>
 
             {/* Footer */}
-            <div className="edit-notes-modal-footer">
+            <div className="edit-notes-modal-footer modal-panel-foot">
               <div className="edit-notes-modal-footer-content">
                 {error ? (
                   <div className="edit-notes-modal-error">{error}</div>

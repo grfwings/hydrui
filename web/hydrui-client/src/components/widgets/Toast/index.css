@@ -18,6 +18,30 @@
   background-color: var(--color-gray-800);
 }
 
+@media (max-width: 640px) {
+  /* Phone: notifications sit full-width at the bottom, above the bottom bar
+     and clear of the home indicator. */
+  .toast-container {
+    top: auto;
+    left: max(0.75rem, var(--safe-left));
+    right: max(0.75rem, var(--safe-right));
+    bottom: calc(var(--compact-bottom-bar-height) + 0.75rem);
+  }
+
+  .toast {
+    width: auto;
+  }
+
+  .toast-close-button {
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: -0.5rem -0.5rem -0.5rem 0;
+  }
+}
+
 .toast-error {
   background-color: color-mix(in oklab, var(--color-gray-700) 50%, transparent);
   backdrop-filter: blur(var(--blur-xs));

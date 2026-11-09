@@ -160,3 +160,44 @@
   opacity: 0.25;
   cursor: not-allowed;
 }
+
+/* Touch: rows and controls get full-size targets. Height must stay in sync
+   with TAG_LIST_ENTRY_HEIGHT_TOUCH in TagList.tsx. */
+@media (pointer: coarse) {
+  .tag-list-entry {
+    height: 44px;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .tag-list-header label {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-target, 44px);
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .tag-list-header label input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.5rem;
+  }
+
+  .tag-button {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tag-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .tag-count {
+    margin-right: 0.5rem;
+  }
+}

@@ -71,6 +71,11 @@ const LoginScreen: React.FC = () => {
               className="login-input"
               placeholder="Username"
               required
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="next"
             />
           </div>
 
@@ -85,6 +90,8 @@ const LoginScreen: React.FC = () => {
               className="login-input"
               placeholder="Password"
               required
+              autoComplete="current-password"
+              enterKeyHint="go"
             />
           </div>
 

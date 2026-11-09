@@ -3,6 +3,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--color-gray-900);
 }
 
@@ -68,4 +69,37 @@
 .setup-form-buttons {
   display: flex;
   gap: 0.5em;
+}
+
+@media (max-width: 640px) {
+  .setup-screen {
+    padding: max(1rem, var(--safe-top, 0px)) max(1rem, var(--safe-right, 0px))
+      max(1rem, var(--safe-bottom, 0px)) max(1rem, var(--safe-left, 0px));
+  }
+
+  .setup-form-container {
+    padding: 1.25rem;
+  }
+
+  .setup-form-buttons {
+    flex-wrap: wrap;
+  }
+
+  .setup-form-buttons > * {
+    flex: 1 1 8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (pointer: coarse) {
+  .setup-input,
+  .setup-form-buttons .push-button {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .setup-input {
+    font-size: 1rem;
+  }
 }

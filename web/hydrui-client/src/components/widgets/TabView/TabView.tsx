@@ -1,5 +1,5 @@
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/solid";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import PageView from "@/components/widgets/PageView/PageView";
 import {
@@ -27,6 +27,7 @@ const TabRow: React.FC<TabRowProps> = ({ tabs }) => {
   const [currentIndex, setCurrentIndex] = useState<number>(() =>
     resolveActiveTabIndex(tabs, activePageKey, -1),
   );
+  const tabBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const nextIndex = resolveActiveTabIndex(tabs, activePageKey, currentIndex);
@@ -34,6 +35,29 @@ const TabRow: React.FC<TabRowProps> = ({ tabs }) => {
       setCurrentIndex(nextIndex);
     }
   }, [tabs, currentIndex, activePageKey]);
+
+  // Keep the active tab visible when the tab strip scrolls horizontally (the
+  // phone layout can show only a few tabs at once).
+  useEffect(() => {
+    const bar = tabBarRef.current;
+    const tab = bar?.children[currentIndex] as HTMLElement | undefined;
+    if (!bar || !tab) {
+      return;
+    }
+    const left = tab.offsetLeft;
+    const right = left + tab.offsetWidth;
+    const visibleLeft = bar.scrollLeft;
+    const visibleRight = visibleLeft + bar.clientWidth;
+    if (left < visibleLeft || right > visibleRight) {
+      const prefersReducedMotion = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      bar.scrollTo({
+        left: left < visibleLeft ? left : right - bar.clientWidth,
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+      });
+    }
+  }, [currentIndex, tabs]);
 
   const setTab = async (index: number) => {
     if (!tabs[index]) {
@@ -201,7 +225,12 @@ const TabRow: React.FC<TabRowProps> = ({ tabs }) => {
   return (
     <div className="tab-view-container">
       {/* Tab bar */}
-      <div className="tab-bar" role="tablist" aria-label="Page tabs">
+      <div
+        className="tab-bar"
+        role="tablist"
+        aria-label="Page tabs"
+        ref={tabBarRef}
+      >
         {tabs.map((tab, index) => (
           <div
             key={tab.key}

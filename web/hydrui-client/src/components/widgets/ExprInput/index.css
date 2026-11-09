@@ -202,3 +202,37 @@
   outline: 2px solid var(--color-blue-400);
   outline-offset: 2px;
 }
+
+@media (max-width: 640px) {
+  .expr-popup {
+    right: 0;
+    left: 0;
+    width: auto;
+  }
+
+  .expr-suggestions {
+    max-width: calc(100vw - 2rem);
+  }
+}
+
+@media (pointer: coarse) {
+  .expr-history-button,
+  .expr-save-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+  }
+
+  .expr-history-entry,
+  .expr-bookmark-entry,
+  .expr-suggestion-item {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .expr-input,
+  .expr-bookmark-name-input {
+    font-size: 1rem;
+  }
+}

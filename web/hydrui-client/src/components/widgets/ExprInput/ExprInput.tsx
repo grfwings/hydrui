@@ -3,6 +3,7 @@ import { ClockIcon } from "@heroicons/react/24/solid";
 import { TrashIcon } from "@heroicons/react/24/solid";
 import React, { useCallback, useRef, useState } from "react";
 
+import { useIsCoarsePointer } from "@/hooks/useMediaQuery";
 import { Suggestions, getSuggestions } from "@/utils/script/infer";
 import { Parser } from "@/utils/script/parse";
 import { Resolver } from "@/utils/script/resolver";
@@ -40,6 +41,7 @@ const ExprInput: React.FC<ExprInputProps> = ({
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const measureRef = useRef<HTMLSpanElement | null>(null);
+  const isCoarsePointer = useIsCoarsePointer();
   const [suggestions, setSuggestions] = useState<Suggestions>();
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -209,10 +211,15 @@ const ExprInput: React.FC<ExprInputProps> = ({
           placeholder="Enter an expression..."
           className="expr-input"
           disabled={disabled}
-          autoFocus={true}
+          autoFocus={!isCoarsePointer}
           defaultValue={expressionHistory[0] ?? ""}
           onKeyDown={handleInputKeyDown}
           onChange={refreshSuggestions}
+          autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="go"
         />
         <button
           className={`expr-history-button ${popupView === "history" ? "active" : ""}`}

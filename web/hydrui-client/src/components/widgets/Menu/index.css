@@ -127,6 +127,7 @@
 
 .submenu {
   position: fixed;
+  z-index: 40;
   min-width: 200px;
   background-color: var(--color-gray-800);
   border-radius: var(--radius-sm);
@@ -139,4 +140,136 @@
 
 .submenu.visible {
   opacity: 1;
+}
+
+/* Keep flyout menus inside the viewport and let them scroll when long. */
+.menu-bar .submenu,
+.submenu {
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Phone action-sheet presentation of the context menu. */
+.context-menu-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+}
+
+.context-menu-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+  animation: context-menu-backdrop-in 160ms var(--ease-in-out);
+}
+
+.context-menu-sheet {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  min-width: 0;
+  max-height: 80dvh;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  padding-bottom: var(--safe-bottom);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+  animation: context-menu-sheet-up 200ms var(--ease-in-out);
+}
+
+.context-menu-sheet-grab {
+  flex: none;
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  margin: 8px 0 4px;
+  border-radius: 9999px;
+  background-color: var(--color-gray-500);
+}
+
+.context-menu-sheet-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+
+.menu-list-drill-in {
+  padding-top: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+
+.menu-list-drill-in .menu-item {
+  padding-left: 1rem;
+  padding-right: 1.25rem;
+}
+
+.menu-list-drill-in .menu-item:active {
+  background-color: var(--color-gray-700);
+}
+
+/* Touch sizing: comfortable rows on phones, including flyouts on touch
+   laptops. Desktop with a mouse is unchanged. */
+@media (max-width: 640px), (pointer: coarse) {
+  .menu-item {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .menu-list-drill-in .menu-item {
+    font-size: var(--text-lg);
+  }
+
+  .menu-divider {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .menu-bar-item {
+    min-height: var(--touch-target, 44px);
+    display: flex;
+    align-items: center;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    font-size: var(--text-lg);
+  }
+
+  .context-menu-sheet .menu-icon,
+  .context-menu-sheet .menu-chevron {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+@keyframes context-menu-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes context-menu-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-menu-sheet,
+  .context-menu-sheet-backdrop {
+    animation: none;
+  }
 }

@@ -96,3 +96,20 @@
   font-size: var(--text-xs);
   color: var(--color-gray-400);
 }
+
+@media (pointer: coarse) {
+  /* Stack labels above controls so 44px rating targets never squeeze a long
+     service name or overflow a 320px screen. */
+  .file-preview-rating-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    min-height: var(--touch-target, 44px);
+    margin-bottom: 0.5rem;
+  }
+
+  .file-preview-metadata-row {
+    line-height: 1.5;
+    margin-bottom: 0.25rem;
+  }
+}

@@ -1,4 +1,4 @@
-import { ChevronRightIcon } from "@heroicons/react/24/solid";
+import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/solid";
 import React, {
   CSSProperties,
   useCallback,
@@ -370,3 +370,167 @@ const MenuList: React.FC<MenuListProps> = ({
 };
 
 export default MenuList;
+
+interface DrillInMenuListProps {
+  items: MenuItem[];
+  activeSubmenuPath: string[];
+  setActiveSubmenuPath: (path: string[]) => void;
+  onClose: () => void;
+}
+
+const BACK_ID = "__menu_back";
+
+/**
+ * Phone presentation of a menu: the current level fills the sheet and picking a
+ * submenu replaces the list with its contents plus a Back row, instead of
+ * opening a flyout.
+ */
+export const DrillInMenuList: React.FC<DrillInMenuListProps> = ({
+  items,
+  activeSubmenuPath,
+  setActiveSubmenuPath,
+  onClose,
+}) => {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+
+  // Resolve the items for the level the user has drilled into.
+  let currentItems = items;
+  for (const id of activeSubmenuPath) {
+    const parent = currentItems.find((item) => item.id === id);
+    if (!parent?.items) {
+      currentItems = [];
+      break;
+    }
+    currentItems = parent.items;
+  }
+
+  const canGoBack = activeSubmenuPath.length > 0;
+  const rows: MenuItem[] = canGoBack
+    ? [{ id: BACK_ID, label: "Back" }, ...currentItems]
+    : currentItems;
+  const navigableItems = rows.filter((item) => !item.divider);
+
+  // Move focus to the list whenever the level changes.
+  useEffect(() => {
+    setFocusedId(null);
+    menuRef.current?.focus();
+  }, [activeSubmenuPath]);
+
+  const activateItem = useCallback(
+    (item: MenuItem) => {
+      if (item.disabled) return;
+      if (item.id === BACK_ID) {
+        setActiveSubmenuPath(activeSubmenuPath.slice(0, -1));
+      } else if (item.items) {
+        setFocusedId(null);
+        setActiveSubmenuPath([...activeSubmenuPath, item.id]);
+      } else if (item.onClick) {
+        item.onClick();
+        onClose();
+      }
+    },
+    [activeSubmenuPath, onClose, setActiveSubmenuPath],
+  );
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const currentIndex = focusedId
+        ? navigableItems.findIndex((item) => item.id === focusedId)
+        : -1;
+      let nextIndex = currentIndex;
+
+      switch (event.key) {
+        case "ArrowDown":
+          event.preventDefault();
+          nextIndex =
+            currentIndex === -1
+              ? 0
+              : (currentIndex + 1) % navigableItems.length;
+          break;
+        case "ArrowUp":
+          event.preventDefault();
+          nextIndex =
+            currentIndex === -1
+              ? navigableItems.length - 1
+              : (currentIndex - 1 + navigableItems.length) %
+                navigableItems.length;
+          break;
+        case "ArrowLeft":
+          if (canGoBack) {
+            event.preventDefault();
+            setActiveSubmenuPath(activeSubmenuPath.slice(0, -1));
+          }
+          return;
+        case "Enter":
+        case " ": {
+          event.preventDefault();
+          const currentItem = navigableItems[currentIndex];
+          if (currentItem) {
+            activateItem(currentItem);
+          }
+          return;
+        }
+        default:
+          return;
+      }
+
+      if (nextIndex !== currentIndex) {
+        const nextItem = navigableItems[nextIndex];
+        if (nextItem) {
+          setFocusedId(nextItem.id);
+        }
+      }
+    },
+    [
+      focusedId,
+      navigableItems,
+      canGoBack,
+      activeSubmenuPath,
+      setActiveSubmenuPath,
+      activateItem,
+    ],
+  );
+
+  return (
+    <div
+      ref={menuRef}
+      className="menu-list menu-list-drill-in"
+      role="menu"
+      aria-orientation="vertical"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
+      {rows.map((item) => {
+        if (item.divider) {
+          return (
+            <div key={item.id} className="menu-divider" role="separator" />
+          );
+        }
+
+        const isBack = item.id === BACK_ID;
+        const isFocused = focusedId === item.id;
+
+        return (
+          <div
+            key={item.id}
+            className={`menu-item menu-item-touch ${isFocused ? "active" : ""} ${item.disabled ? "disabled" : ""}`}
+            role="menuitem"
+            aria-haspopup={item.items ? "menu" : undefined}
+            aria-disabled={item.disabled || undefined}
+            onClick={() => activateItem(item)}
+            onMouseEnter={() => setFocusedId(item.id)}
+          >
+            {isBack ? (
+              <ChevronLeftIcon className="menu-icon" />
+            ) : (
+              item.icon && <span className="menu-icon">{item.icon}</span>
+            )}
+            <span className="menu-label">{item.label}</span>
+            {item.items && <ChevronRightIcon className="menu-chevron" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+};

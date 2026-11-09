@@ -1,4 +1,4 @@
-import { InformationCircleIcon } from "@heroicons/react/24/solid";
+import { InformationCircleIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { FocusTrap } from "focus-trap-react";
 import React, { useCallback, useRef, useState } from "react";
 
@@ -104,17 +104,24 @@ const ExpressionSortModal: React.FC<ExpressionSortModalProps> = ({
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="expr-sort-modal-container">
-        <div className="expr-sort-modal-wrapper">
+        <div className="expr-sort-modal-wrapper modal-shell modal-sheet">
           <div className="expr-sort-modal-backdrop" onClick={onClose} />
 
-          <div className="expr-sort-modal-content">
+          <div className="expr-sort-modal-content modal-panel">
             {/* Header */}
-            <div className="expr-sort-modal-header">
+            <div className="expr-sort-modal-header modal-panel-head">
               <h3 className="expr-sort-modal-title">Expression Sort</h3>
+              <button
+                onClick={onClose}
+                className="modal-close modal-close-compact"
+                aria-label="Close"
+              >
+                <XMarkIcon />
+              </button>
             </div>
 
             {/* Content */}
-            <div className="expr-sort-modal-body">
+            <div className="expr-sort-modal-body modal-panel-scroll">
               <ExprInput
                 onEnter={execute}
                 getPlaceholders={getPlaceholders}
@@ -149,7 +156,7 @@ const ExpressionSortModal: React.FC<ExpressionSortModalProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="expr-sort-modal-footer">
+            <div className="expr-sort-modal-footer modal-panel-foot">
               <a
                 className="push-button primary"
                 style={{

@@ -47,6 +47,33 @@
   animation: var(--animate-pulse);
 }
 
+/* Phone: a single round icon button above the bottom bar instead of a wide
+   pill that sits on top of the thumbnail grid. The accessible name is kept on
+   the button itself. */
+.popup-collapsed-button-compact {
+  bottom: calc(var(--compact-bottom-bar-height) + 0.75rem);
+  right: max(0.75rem, var(--safe-right));
+  width: var(--touch-target, 44px);
+  height: var(--touch-target, 44px);
+  min-width: var(--touch-target, 44px);
+  min-height: var(--touch-target, 44px);
+  padding: 0;
+  border-radius: 9999px;
+  justify-content: center;
+  opacity: 0.9;
+}
+
+.popup-collapsed-button-compact .popup-notification-indicator {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.popup-collapsed-button-compact .popup-collapsed-icon {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
 .popup-panel {
   position: fixed;
   bottom: 3.5rem;
@@ -191,4 +218,25 @@
 .popup-job-file-count {
   color: var(--color-gray-400);
   font-size: var(--text-xs);
+}
+
+@media (max-width: 640px) {
+  /* Phone: the expanded panel spans the screen width rather than overflowing
+     the viewport at 24rem + margin. */
+  .popup-panel {
+    left: max(0.75rem, var(--safe-left));
+    right: max(0.75rem, var(--safe-right));
+    bottom: calc(var(--compact-bottom-bar-height) + 0.75rem);
+    width: auto;
+    max-height: 60dvh;
+  }
+
+  .popup-panel-close-button,
+  .popup-job-action-button {
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }

@@ -176,3 +176,54 @@
   width: 80px;
   opacity: 1;
 }
+
+/* Touch: real 44px hit areas, fatter seek bar, safe-area padding. */
+@media (pointer: coarse) {
+  .player-chrome-control-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+
+  .player-chrome-control-btn > svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .player-chrome-seek-bar {
+    top: -12px;
+    height: 28px;
+  }
+
+  .player-chrome-seek-bar::-webkit-slider-thumb {
+    height: 16px;
+    width: 16px;
+    margin-top: -6px;
+  }
+
+  .player-chrome-bottom-bar {
+    gap: 0.5rem;
+  }
+
+  .player-chrome-left-group {
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .player-chrome-time-display {
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .player-chrome-controls-content {
+    padding: 0 12px calc(12px + var(--safe-bottom, 0px));
+  }
+
+  /* Controls hidden by the idle timer must not swallow the tap that should
+     bring them back. */
+  .player-chrome-controls-overlay.hidden .player-chrome-controls-content {
+    pointer-events: none;
+  }
+}

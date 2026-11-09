@@ -11,6 +11,7 @@ import { FileMetadata } from "@/api/types";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import FileViewer from "@/components/widgets/FileViewer/FileViewer";
 import PushButton from "@/components/widgets/PushButton/PushButton";
+import { useIsCoarsePointer, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useShortcut } from "@/hooks/useShortcut";
 import { client } from "@/store/apiStore";
 import { usePageActions } from "@/store/pageStore";
@@ -38,6 +39,8 @@ import {
   skipFile,
 } from "./archiveDeleteFilter";
 import "./index.css";
+import type { SwipeDecision } from "./swipeGesture";
+import { useSwipeToDecide } from "./useSwipeToDecide";
 
 const DELETE_REASON = "Deleted in Archive/Delete filter.";
 const IMAGE_MIME_PREFIX = "image/";
@@ -67,6 +70,11 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
     EMPTY_ARCHIVE_DELETE_SAVED_FILES,
   );
   const [applyError, setApplyError] = useState<ApplyError | null>(null);
+  const [isMediaZoomed, setIsMediaZoomed] = useState(false);
+  const [swipeHintDismissed, setSwipeHintDismissed] = useState(false);
+
+  const isCoarsePointer = useIsCoarsePointer();
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   const isApplyingRef = useRef(false);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -97,6 +105,31 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
       ? null
       : `${applyError.operation === "delete" ? "Deleting" : "Archiving"} failed: ${applyError.message}`;
   const actionsDisabled = dialog !== "none" || isApplying;
+
+  const swipeEnabled = !isMediaZoomed && !actionsDisabled && !filter.finished;
+  const showSwipeHint =
+    isCoarsePointer &&
+    !swipeHintDismissed &&
+    filter.index === 0 &&
+    counts.kept + counts.deleted + counts.skipped === 0;
+
+  const handleSwipeDecision = useCallback((decision: SwipeDecision) => {
+    setSwipeHintDismissed(true);
+    setFilter((state) =>
+      decision === "delete" ? deleteFile(state) : keepFile(state),
+    );
+  }, []);
+
+  const { surfaceRef, cardRef, deleteLabelRef, keepLabelRef, handlers } =
+    useSwipeToDecide({
+      enabled: swipeEnabled,
+      reduceMotion,
+      onDecide: handleSwipeDecision,
+    });
+
+  useEffect(() => {
+    setIsMediaZoomed(false);
+  }, [currentFileId]);
 
   useEffect(() => {
     if (!filter.finished) {
@@ -248,6 +281,7 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
       focusTrapOptions={{
         allowOutsideClick: true,
         escapeDeactivates: false,
+        initialFocus: () => filterRef.current ?? document.body,
         fallbackFocus: () => filterRef.current ?? document.body,
       }}
     >
@@ -276,18 +310,58 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
           </div>
         </div>
 
+        {showSwipeHint && (
+          <div
+            className="archive-delete-filter-swipe-hint"
+            role="note"
+            onClick={() => setSwipeHintDismissed(true)}
+          >
+            <span aria-hidden="true">←</span> Swipe left to delete, right to
+            keep <span aria-hidden="true">→</span>
+            <span
+              className="archive-delete-filter-swipe-hint-dismiss"
+              aria-hidden="true"
+            >
+              ×
+            </span>
+          </div>
+        )}
+
         <div className="archive-delete-filter-viewer">
-          {currentFileId !== undefined && currentFile ? (
-            <FileViewer
-              key={currentFileId}
-              fileId={currentFileId}
-              fileData={currentFile}
-            />
-          ) : (
-            <div className="archive-delete-filter-empty">
-              No file to display.
+          <div
+            ref={surfaceRef}
+            className="archive-delete-filter-swipe-surface"
+            {...handlers}
+          >
+            <div ref={cardRef} className="archive-delete-filter-swipe-card">
+              {currentFileId !== undefined && currentFile ? (
+                <FileViewer
+                  key={currentFileId}
+                  fileId={currentFileId}
+                  fileData={currentFile}
+                  onMediaZoomChange={setIsMediaZoomed}
+                />
+              ) : (
+                <div className="archive-delete-filter-empty">
+                  No file to display.
+                </div>
+              )}
             </div>
-          )}
+            <div
+              ref={deleteLabelRef}
+              className="archive-delete-filter-swipe-label archive-delete-filter-swipe-label-delete"
+              aria-hidden="true"
+            >
+              DELETE
+            </div>
+            <div
+              ref={keepLabelRef}
+              className="archive-delete-filter-swipe-label archive-delete-filter-swipe-label-keep"
+              aria-hidden="true"
+            >
+              KEEP
+            </div>
+          </div>
         </div>
 
         <div className="archive-delete-filter-actions">

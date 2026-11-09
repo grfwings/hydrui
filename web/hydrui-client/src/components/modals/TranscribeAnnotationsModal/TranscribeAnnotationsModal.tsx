@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import ProviderTranscriptionOptions from "@/components/widgets/ProviderTranscriptionOptions/ProviderTranscriptionOptions";
 import PushButton from "@/components/widgets/PushButton/PushButton";
 import SystemPromptInput from "@/components/widgets/SystemPromptInput/SystemPromptInput";
+import { useIsCoarsePointer } from "@/hooks/useMediaQuery";
 import { useShortcut } from "@/hooks/useShortcut";
 import {
   ProviderConfig,
@@ -34,6 +35,7 @@ const TranscribeAnnotationsModal: React.FC<TranscribeAnnotationsModalProps> = ({
   onClose,
   onStart,
 }) => {
+  const isCoarsePointer = useIsCoarsePointer();
   const providers = useAvailableLLMProviders();
   const selectedBrowserProviderId = useLLMStore(
     (state) => state.selectedProviderId,
@@ -119,30 +121,31 @@ const TranscribeAnnotationsModal: React.FC<TranscribeAnnotationsModalProps> = ({
         onTouchEnd={stopPropagation}
         onWheel={stopPropagation}
       >
-        <div className="transcribe-annotations-modal-wrapper">
+        <div className="transcribe-annotations-modal-wrapper modal-shell modal-full">
           <div
             className="transcribe-annotations-modal-backdrop"
             onClick={onClose}
           />
           <div
-            className="transcribe-annotations-modal-content"
+            className="transcribe-annotations-modal-content modal-panel"
             role="dialog"
             aria-modal="true"
             aria-labelledby="transcribe-annotations-title"
           >
-            <div className="transcribe-annotations-modal-header">
+            <div className="transcribe-annotations-modal-header modal-panel-head">
               <h2 id="transcribe-annotations-title">Transcribe image</h2>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
                 title="Close"
+                className="modal-close"
               >
                 <XMarkIcon />
               </button>
             </div>
 
-            <div className="transcribe-annotations-modal-body">
+            <div className="transcribe-annotations-modal-body modal-panel-scroll">
               <div className="transcribe-annotations-modal-provider">
                 <label htmlFor="transcription-provider">Provider</label>
                 <select
@@ -152,7 +155,7 @@ const TranscribeAnnotationsModal: React.FC<TranscribeAnnotationsModalProps> = ({
                     selectProvider(event.currentTarget.value)
                   }
                   disabled={isServerMode || providers.length === 0}
-                  autoFocus
+                  autoFocus={!isCoarsePointer}
                 >
                   {providers.length === 0 && (
                     <option value="">No providers configured</option>
@@ -196,7 +199,7 @@ const TranscribeAnnotationsModal: React.FC<TranscribeAnnotationsModalProps> = ({
               )}
             </div>
 
-            <div className="transcribe-annotations-modal-footer">
+            <div className="transcribe-annotations-modal-footer modal-panel-foot">
               {provider && !model && <span>Provider model is not set.</span>}
               <div>
                 <PushButton onClick={onClose} variant="secondary">

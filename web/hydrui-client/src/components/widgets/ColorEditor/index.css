@@ -42,3 +42,25 @@
   border: 1px solid var(--color-gray-600);
   margin: 0.25rem;
 }
+
+@media (max-width: 640px) {
+  .color-editor-row label {
+    width: 5.5rem;
+  }
+
+  .color-editor-row input[type="range"] {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@media (pointer: coarse) {
+  .color-editor-row-hex-input,
+  .color-editor-row-component-input {
+    font-size: 1rem;
+  }
+
+  .color-editor-row input[type="range"] {
+    min-height: var(--touch-target, 44px);
+  }
+}

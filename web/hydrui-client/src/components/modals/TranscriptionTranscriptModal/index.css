@@ -1,3 +1,5 @@
+@import "../modal-shared.css";
+
 .transcription-transcript-modal-container {
   position: fixed;
   inset: 0;
@@ -10,6 +12,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 1rem;
 }
 
@@ -26,6 +29,7 @@
   flex-direction: column;
   width: min(76rem, 100%);
   height: min(54rem, calc(100vh - 2rem));
+  height: min(54rem, calc(100dvh - 2rem));
   overflow: hidden;
   border: 1px solid var(--color-gray-600);
   border-radius: var(--radius-lg);
@@ -395,23 +399,7 @@
   }
 }
 
-@media (max-width: 520px) {
-  .transcription-transcript-modal-wrapper {
-    align-items: flex-start;
-    padding: 0.5rem;
-  }
-
-  .transcription-transcript-modal-content {
-    height: calc(100vh - 1rem);
-  }
-
-  .transcription-transcript-modal-header,
-  .transcription-transcript-modal-body,
-  .transcription-transcript-modal-footer {
-    padding-right: 0.75rem;
-    padding-left: 0.75rem;
-  }
-
+@media (max-width: 640px) {
   .transcription-transcript-modal-header > div {
     align-items: flex-start;
     flex-direction: column;

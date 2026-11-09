@@ -1,3 +1,5 @@
+@import "../modal-shared.css";
+
 .set-viewer-override-modal-container {
   position: fixed;
   inset: 0;
@@ -10,6 +12,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 1rem;
 }
 

@@ -176,23 +176,24 @@ const ImportUrlsModal: React.FC<ImportUrlModalProps> = ({
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="import-urls-modal-container">
-        <div className="import-urls-modal-wrapper">
+        <div className="import-urls-modal-wrapper modal-shell modal-full">
           <div className="import-urls-modal-backdrop" onClick={onClose} />
 
-          <div className="import-urls-modal-content">
+          <div className="import-urls-modal-content modal-panel">
             {/* Header */}
-            <div className="import-urls-modal-header">
+            <div className="import-urls-modal-header modal-panel-head">
               <h2 className="import-urls-modal-title">Import URLs</h2>
               <button
                 onClick={onClose}
-                className="import-urls-modal-close-button"
+                className="import-urls-modal-close-button modal-close"
+                aria-label="Close"
               >
                 <XMarkIcon className="import-urls-modal-close-icon" />
               </button>
             </div>
 
             {/* Content */}
-            <div>
+            <div className="modal-panel-scroll modal-panel-scroll-flush">
               {/* URL input */}
               <div className="import-urls-modal-section import-urls-modal-space-y">
                 <label className="import-urls-modal-label">
@@ -203,6 +204,10 @@ const ImportUrlsModal: React.FC<ImportUrlModalProps> = ({
                   placeholder="Enter URLs here..."
                   onChange={(e) => handleUrlInput(e.target.value)}
                   disabled={isImporting}
+                  inputMode="url"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                 />
               </div>
 
@@ -281,7 +286,7 @@ const ImportUrlsModal: React.FC<ImportUrlModalProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="import-urls-modal-footer">
+            <div className="import-urls-modal-footer modal-panel-foot">
               <PushButton
                 onClick={onClose}
                 variant="secondary"

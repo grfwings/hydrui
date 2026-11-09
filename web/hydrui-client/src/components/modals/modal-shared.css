@@ -1,0 +1,179 @@
+/*
+ * Shared phone presentation for dialogs.
+ *
+ * Desktop styling stays in each modal's own index.css. These rules only apply
+ * at or below the compact breakpoint, plus touch sizing under a coarse pointer.
+ * Import this file from each modal's index.css.
+ *
+ * Markup contract:
+ *   .modal-shell            outer fixed overlay / flex wrapper
+ *   .modal-shell.modal-sheet  bottom sheet on phones
+ *   .modal-shell.modal-full   full-screen on phones
+ *   .modal-panel            the dialog panel (the visible card)
+ *   .modal-panel-content    optional flex column between panel and head/scroll
+ *   .modal-panel-head       header row, stays visible while the body scrolls
+ *   .modal-panel-tabs       optional tab strip under the header
+ *   .modal-panel-scroll     internally scrolling region
+ *   .modal-panel-foot       footer actions, pinned to the panel bottom
+ *   .modal-close            close control with a 44px hit area on phones
+ *   .modal-close-compact    close control that only exists on phones
+ */
+
+/* Phone-sheet dialogs also apply to landscape phones, which are wider than the
+   compact breakpoint but too short for a desktop card. */
+@media (max-width: 640px), (max-height: 560px) and (pointer: coarse) {
+  .modal-shell {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    min-width: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .modal-shell.modal-full {
+    align-items: stretch;
+  }
+
+  .modal-shell .modal-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    max-height: calc(100vh - max(1rem, var(--safe-top, 0px)));
+    max-height: calc(100dvh - max(1rem, var(--safe-top, 0px)));
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .modal-shell.modal-full .modal-panel {
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .modal-shell .modal-panel-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .modal-shell .modal-panel-head {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: max(0.75rem, var(--safe-top, 0px))
+      max(1rem, var(--safe-right, 0px)) 0.75rem max(1rem, var(--safe-left, 0px));
+    border-bottom: 1px solid var(--color-gray-700);
+    background-color: var(--color-gray-800);
+  }
+
+  .modal-shell .modal-panel-tabs {
+    flex: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .modal-shell .modal-panel-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .modal-shell .modal-panel-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1rem max(1rem, var(--safe-right, 0px)) 1rem
+      max(1rem, var(--safe-left, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* For scroll regions whose children already provide their own padding. */
+  .modal-shell .modal-panel-scroll-flush {
+    padding: 0;
+  }
+
+  .modal-shell .modal-panel-foot {
+    z-index: 2;
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem max(1rem, var(--safe-right, 0px))
+      calc(0.75rem + var(--safe-bottom, 0px)) max(1rem, var(--safe-left, 0px));
+    border-top: 1px solid var(--color-gray-700);
+    background-color: var(--color-gray-800);
+  }
+
+  /* Buttons share the footer width so the primary action stays thumb-reachable. */
+  .modal-shell .modal-panel-foot > .push-button {
+    flex: 1 1 6rem;
+    min-height: var(--touch-target, 44px);
+  }
+
+  .modal-shell .modal-panel-head .modal-close {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+    margin: -0.5rem -0.5rem -0.5rem 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-gray-400);
+    background: transparent;
+  }
+
+  .modal-shell .modal-panel-head .modal-close:hover {
+    color: var(--color-white);
+  }
+
+  .modal-shell .modal-panel-head .modal-close svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+/* Newly added close buttons must not change the desktop appearance. */
+.modal-close-compact {
+  display: none;
+}
+
+@media (max-width: 640px), (max-height: 560px) and (pointer: coarse) {
+  .modal-shell .modal-close-compact {
+    display: inline-flex;
+  }
+}
+
+@media (pointer: coarse) {
+  /* Component styles often set 0.875rem; undo that for iOS focus-zoom. */
+  .modal-shell .modal-panel input,
+  .modal-shell .modal-panel select,
+  .modal-shell .modal-panel textarea {
+    font-size: 1rem;
+  }
+
+  .modal-shell .modal-panel-head .modal-close,
+  .modal-shell .modal-panel-tabs button {
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+  }
+}

@@ -436,111 +436,122 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <ExclamationCircleIcon className="page-search-bar-error-icon" />
         )}
 
-        {/* Render tag pills */}
-        {searchTags.map(
-          (tag, index) =>
-            editingTagIndex !== index && (
-              <div
-                key={tag}
-                className={`page-search-tag ${
-                  editingTagIndex === index ? "page-search-tag-editing" : ""
-                }`}
-                onClick={() => handleEditTag(index)}
-              >
-                <TagLabel tag={tag} />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveTag(tag);
-                  }}
-                  className="page-search-tag-remove"
+        <div className="page-search-input-row">
+          {/* Render tag pills */}
+          {searchTags.map(
+            (tag, index) =>
+              editingTagIndex !== index && (
+                <div
+                  key={tag}
+                  className={`page-search-tag ${
+                    editingTagIndex === index ? "page-search-tag-editing" : ""
+                  }`}
+                  onClick={() => handleEditTag(index)}
                 >
-                  <XMarkIcon className="page-search-tag-remove-icon" />
-                </button>
-              </div>
-            ),
-        )}
-
-        {/* Input field */}
-        <div className="page-search-input-wrapper">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setHasFocus(true)}
-            onBlur={() => setHasFocus(false)}
-            placeholder={
-              searchTags.length > 0 ? "Add tag..." : "Search tags..."
-            }
-            className="page-search-input"
-          />
-
-          {controls && (
-            <>
-              <select
-                value={searchSort}
-                onChange={(e) =>
-                  setSearchSort(Number(e.target.value) as SortFilesBy)
-                }
-                className="page-sort-dropdown"
-                title={`Sorting by: ${sortFilesByEnumToString.get(searchSort)}`}
-              >
-                <option disabled={true}>Sort by...</option>
-                {Array.from(sortFilesByEnumToString.entries()).map(
-                  ([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ),
-                )}
-              </select>
-
-              <button
-                onClick={toggleSearchDirection}
-                className="page-sort-direction-button"
-                title={
-                  searchAscending
-                    ? "Currently sorting ascending (click to sort descending)"
-                    : "Currently sorting descending (click to sort ascending)"
-                }
-              >
-                {searchAscending ? (
-                  <BarsArrowDownIcon className="page-sort-direction-icon" />
-                ) : (
-                  <BarsArrowUpIcon className="page-sort-direction-icon" />
-                )}
-              </button>
-
-              <button
-                onClick={toggleAutoSearch}
-                className={`page-auto-search-button ${
-                  autoSearch
-                    ? "page-auto-search-enabled"
-                    : "page-auto-search-disabled"
-                }`}
-                title={
-                  autoSearch
-                    ? "Auto-search enabled (click to disable)"
-                    : "Auto-search disabled (click to enable)"
-                }
-              >
-                <BoltIcon className="page-auto-search-button-icon" />
-              </button>
-
-              <button
-                onClick={handleSearch}
-                disabled={searchStatus === "loading"}
-                className={`page-search-button ${
-                  searchStatus === "loading" ? "page-search-button-loading" : ""
-                }`}
-              >
-                <MagnifyingGlassIcon className="page-search-button-icon" />
-              </button>
-            </>
+                  <TagLabel tag={tag} />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveTag(tag);
+                    }}
+                    className="page-search-tag-remove"
+                    aria-label={`Remove ${tag}`}
+                  >
+                    <XMarkIcon className="page-search-tag-remove-icon" />
+                  </button>
+                </div>
+              ),
           )}
+
+          {/* Input field */}
+          <div className="page-search-input-wrapper">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setHasFocus(true)}
+              onBlur={() => setHasFocus(false)}
+              placeholder={
+                searchTags.length > 0 ? "Add tag..." : "Search tags..."
+              }
+              className="page-search-input"
+            />
+          </div>
         </div>
+
+        {controls && (
+          <div className="page-search-controls">
+            <select
+              value={searchSort}
+              onChange={(e) =>
+                setSearchSort(Number(e.target.value) as SortFilesBy)
+              }
+              className="page-sort-dropdown"
+              title={`Sorting by: ${sortFilesByEnumToString.get(searchSort)}`}
+              aria-label="Sort files by"
+            >
+              <option disabled={true}>Sort by...</option>
+              {Array.from(sortFilesByEnumToString.entries()).map(
+                ([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ),
+              )}
+            </select>
+
+            <button
+              onClick={toggleSearchDirection}
+              className="page-sort-direction-button"
+              title={
+                searchAscending
+                  ? "Currently sorting ascending (click to sort descending)"
+                  : "Currently sorting descending (click to sort ascending)"
+              }
+              aria-label={
+                searchAscending ? "Sort descending" : "Sort ascending"
+              }
+            >
+              {searchAscending ? (
+                <BarsArrowDownIcon className="page-sort-direction-icon" />
+              ) : (
+                <BarsArrowUpIcon className="page-sort-direction-icon" />
+              )}
+            </button>
+
+            <button
+              onClick={toggleAutoSearch}
+              className={`page-auto-search-button ${
+                autoSearch
+                  ? "page-auto-search-enabled"
+                  : "page-auto-search-disabled"
+              }`}
+              title={
+                autoSearch
+                  ? "Auto-search enabled (click to disable)"
+                  : "Auto-search disabled (click to enable)"
+              }
+              aria-label={
+                autoSearch ? "Disable auto-search" : "Enable auto-search"
+              }
+            >
+              <BoltIcon className="page-auto-search-button-icon" />
+            </button>
+
+            <button
+              onClick={handleSearch}
+              disabled={searchStatus === "loading"}
+              className={`page-search-button ${
+                searchStatus === "loading" ? "page-search-button-loading" : ""
+              }`}
+              aria-label="Search"
+            >
+              <MagnifyingGlassIcon className="page-search-button-icon" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Suggestions dropdown */}

@@ -7,7 +7,7 @@ import { formatFileSize } from "@/utils/format";
 
 import "./index.css";
 
-const StatusBar: React.FC = () => {
+const StatusBar: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const { searchTags, searchStatus } = useSearchStore();
   const {
     loadedFiles,
@@ -44,13 +44,14 @@ const StatusBar: React.FC = () => {
   );
 
   return (
-    <div className="status-bar">
+    <div className={`status-bar ${compact ? "status-bar-compact" : ""}`}>
       <div className="status-bar-info">
         {isLoadingFiles && (
           <button
             onClick={handlePauseToggle}
             className="status-bar-pause-button"
             title={isLoadingPaused ? "Resume loading" : "Pause loading"}
+            aria-label={isLoadingPaused ? "Resume loading" : "Pause loading"}
           >
             {isLoadingPaused ? (
               <PlayIcon className="status-bar-pause-icon" />
@@ -129,7 +130,8 @@ const StatusBar: React.FC = () => {
           )}
         </div>
 
-        {loadedFiles.length > 0 &&
+        {!compact &&
+          loadedFiles.length > 0 &&
           fileStats.images + fileStats.videos + fileStats.other > 0 && (
             <div className="status-bar-file-stats">
               {fileStats.images > 0 && (
@@ -147,7 +149,7 @@ const StatusBar: React.FC = () => {
           )}
       </div>
 
-      {fileStats.totalSize > 0 && (
+      {!compact && fileStats.totalSize > 0 && (
         <div>Total size: {formatFileSize(fileStats.totalSize)}</div>
       )}
     </div>

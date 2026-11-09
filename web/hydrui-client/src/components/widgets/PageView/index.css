@@ -152,6 +152,114 @@
   cursor: pointer;
   background-color: var(--color-gray-700);
   margin: 0 auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.file-item-touch-selected::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: color-mix(in oklab, var(--color-blue-500) 26%, transparent);
+  pointer-events: none;
+}
+
+.file-item-selection-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 9999px;
+  background-color: var(--color-blue-500);
+  color: var(--color-white);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 45%);
+  pointer-events: none;
+}
+
+.file-item-selection-badge-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke-width: 3;
+}
+
+.touch-selection-bar {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: calc(
+    0.5rem +
+      var(
+        --page-safe-bottom,
+        var(--safe-bottom, env(safe-area-inset-bottom, 0px))
+      )
+  );
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3.25rem;
+  padding: 0.25rem 0.375rem;
+  border: 1px solid var(--color-gray-600);
+  border-radius: 0.625rem;
+  background-color: color-mix(in oklab, var(--color-gray-800) 94%, transparent);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 35%);
+  backdrop-filter: blur(6px);
+}
+
+.touch-selection-bar-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: var(--touch-target, 44px);
+  min-height: var(--touch-target, 44px);
+  padding: 0 0.75rem;
+  border-radius: 0.375rem;
+  color: var(--color-gray-100);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.touch-selection-bar-button:hover,
+.touch-selection-bar-button:focus-visible {
+  background-color: var(--color-gray-700);
+}
+
+.touch-selection-bar-exit {
+  color: var(--color-gray-300);
+}
+
+.touch-selection-bar-count {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-gray-200);
+  font-size: var(--text-sm);
+}
+
+.touch-selection-bar-actions {
+  background-color: var(--color-blue-600);
+  color: var(--color-white);
+}
+
+.touch-selection-bar-actions:hover,
+.touch-selection-bar-actions:focus-visible {
+  background-color: var(--color-blue-500);
+}
+
+.touch-selection-bar-icon {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .file-item-selected {
@@ -214,6 +322,25 @@
 
 .page-search-bar {
   width: 100%;
+}
+
+.page-search-input-row {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.page-search-controls {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.page-search-controls > :first-child {
+  margin-left: 0;
 }
 
 .page-search-bar-input-container {
@@ -380,7 +507,10 @@
   left: 0;
   right: 0;
   max-height: 15rem;
+  max-height: min(15rem, 50dvh);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background-color: var(--color-gray-700);
   border-radius: var(--radius-sm);
   z-index: 10;
@@ -468,4 +598,157 @@
 
 .system-tag-text::placeholder {
   color: var(--color-gray-400);
+}
+
+/* Compact (phone) layout: fill the width with at least three columns and let
+   the search bar stack into a tag row plus a controls row. */
+@media (max-width: 640px) {
+  .files-grid {
+    padding: 8px;
+  }
+
+  .files-grid-loading,
+  .files-grid-error,
+  .files-grid-empty {
+    min-height: 40vh;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .page-search-input-row {
+    flex: 1 0 100%;
+  }
+
+  .page-search-input-wrapper {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .page-search-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .page-search-controls {
+    flex: 1 0 100%;
+    gap: 0.5rem;
+  }
+
+  .page-sort-dropdown {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .page-sort-direction-button,
+  .page-auto-search-button,
+  .page-search-button {
+    margin-left: 0;
+  }
+
+  .page-search-tag {
+    max-width: 100%;
+  }
+
+  .page-search-suggestions {
+    max-height: min(20rem, 50dvh);
+  }
+
+  /* System tag popovers must fit narrow screens. */
+  .system-tag-form {
+    flex-wrap: wrap;
+  }
+
+  .system-tag-operator,
+  .system-tag-number,
+  .system-tag-text {
+    min-width: 0;
+  }
+
+  .system-tag-form .system-tag-number,
+  .system-tag-form .system-tag-text {
+    flex: 1 1 100%;
+  }
+
+  .system-tag-form .star-rating-container {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* Touch sizing. Behaviour is decided per pointer event in JS; this block only
+   enlarges targets for fingers. */
+@media (pointer: coarse) {
+  .page-search-input,
+  .system-tag-text,
+  .system-tag-number {
+    font-size: 1rem;
+  }
+
+  .page-search-input {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .page-search-tag {
+    min-height: var(--touch-target, 44px);
+    padding-left: 0.625rem;
+  }
+
+  .page-search-tag-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+    margin-right: -0.5rem;
+  }
+
+  .page-search-suggestion-item {
+    min-height: var(--touch-target, 44px);
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .page-sort-dropdown,
+  .page-sort-direction-button,
+  .page-auto-search-button,
+  .page-search-button {
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+  }
+
+  .page-search-button {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+
+  .system-tag-operator,
+  .system-tag-number,
+  .system-tag-text {
+    min-height: var(--touch-target, 44px);
+    font-size: 1rem;
+  }
+
+  .system-tag-form button {
+    min-height: var(--touch-target, 44px);
+  }
+}
+
+/* Keep the last row reachable when the touch selection bar floats above it. */
+.files-grid-touch-selection {
+  padding-bottom: calc(
+    5.5rem +
+      var(
+        --page-safe-bottom,
+        var(--safe-bottom, env(safe-area-inset-bottom, 0px))
+      )
+  );
+}
+
+/* The bottom overflow indicator would sit under the touch selection bar. */
+.files-grid-viewport-touch-selection .page-selection-overflow-indicator-bottom {
+  bottom: 4.5rem;
 }

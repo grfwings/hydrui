@@ -5,9 +5,11 @@ import {
   ArrowTopRightOnSquareIcon,
   ArrowUpTrayIcon,
   ArrowUturnDownIcon,
+  CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   DocumentIcon,
+  EllipsisHorizontalIcon,
   ExclamationCircleIcon,
   FunnelIcon,
   LinkIcon,
@@ -19,6 +21,7 @@ import {
   TagIcon,
   TrashIcon,
   WrenchScrewdriverIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { ArrowDownTrayIcon } from "@heroicons/react/24/solid";
 import React, {
@@ -49,6 +52,7 @@ import { HydrusFileType, filetypeEnumToExt } from "@/constants/filetypes";
 import { renderDispatch } from "@/file/renderers";
 import { useContextMenu } from "@/hooks/useContextMenu";
 import useLongPress from "@/hooks/useLongPress";
+import { useIsCompactLayout } from "@/hooks/useMediaQuery";
 import { useShortcut } from "@/hooks/useShortcut";
 import { client } from "@/store/apiStore";
 import { MenuItem, useContextMenuStore } from "@/store/contextMenuStore";
@@ -60,6 +64,7 @@ import { isServerMode } from "@/utils/modes";
 
 import { PageSearchBar } from "./PageSearchBar";
 import { Thumbnail } from "./Thumbnail";
+import { GridMetrics, computeGridMetrics } from "./gridMetrics";
 import "./index.css";
 import {
   createSelectionIndex,
@@ -73,10 +78,34 @@ import {
 // render view. This combats scroll jank at the cost of making rendering more
 // expensive.
 const SCROLL_SLACK = 200;
-const GAP_SIZE = 16;
+
+// Clearance, in CSS pixels, for the floating touch selection bar when scrolling
+// the last selected file into view.
+const TOUCH_SELECTION_BAR_OFFSET = 72;
 
 // Referentially stable empty array.
 const EMPTY_ARRAY: never[] = [];
+
+function isTouchPointerType(pointerType: string | undefined): boolean {
+  return pointerType === "touch" || pointerType === "pen";
+}
+
+function contextMenuCameFromTouch(
+  event: React.MouseEvent,
+  lastPointerType: string | undefined,
+): boolean {
+  const sourceCapabilities = (
+    event.nativeEvent as
+      | (MouseEvent & {
+          sourceCapabilities?: { firesTouchEvents?: boolean } | null;
+        })
+      | undefined
+  )?.sourceCapabilities;
+  if (sourceCapabilities?.firesTouchEvents) {
+    return true;
+  }
+  return isTouchPointerType(lastPointerType);
+}
 
 interface PageViewProps {
   pageKey: string;
@@ -114,6 +143,7 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
 
   const { thumbnailSize, useVirtualViewport, allowTokenPassing } =
     usePreferencesStore();
+  const isCompactLayout = useIsCompactLayout();
 
   const {
     actions: { addToast, removeToast, updateToastProgress },
@@ -463,8 +493,16 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     ...viewMenuItems,
   ];
 
-  // Calculate grid dimensions based on container width
-  const [gridDimensions, setGridDimensions] = useState({ cols: 4, rows: 1 });
+  // Grid geometry (columns, rows, effective cell size) for the current viewport.
+  const [gridMetrics, setGridMetrics] = useState<GridMetrics>(() =>
+    computeGridMetrics(0, fileIds.length, thumbnailSize, false),
+  );
+
+  // Touch-specific selection mode. Mouse users keep the existing behaviour and
+  // never enter this mode.
+  const [touchSelectionMode, setTouchSelectionMode] = useState(false);
+  const actionsButtonRef = useRef<HTMLButtonElement>(null);
+  const lastPointerTypeRef = useRef<string | undefined>(undefined);
 
   const updateSelectionOverflow = useCallback(() => {
     const grid = gridRef.current;
@@ -472,9 +510,10 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
 
     const nextOverflow = getSelectionOverflow({
       selectionIndex,
-      columns: gridDimensions.cols,
-      itemSize: thumbnailSize,
-      gapSize: GAP_SIZE,
+      columns: gridMetrics.columns,
+      itemSize: gridMetrics.cellSize,
+      gapSize: gridMetrics.gap,
+      paddingSize: gridMetrics.padding,
       scrollTop: grid.scrollTop,
       viewportHeight: grid.clientHeight,
     });
@@ -484,7 +523,7 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
         ? currentOverflow
         : nextOverflow,
     );
-  }, [gridDimensions.cols, selectionIndex, thumbnailSize]);
+  }, [gridMetrics, selectionIndex]);
 
   const scrollToSelectionEdge = useCallback(
     (edge: "top" | "bottom") => {
@@ -495,16 +534,23 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
         edge,
         {
           selectionIndex,
-          columns: gridDimensions.cols,
-          itemSize: thumbnailSize,
-          gapSize: GAP_SIZE,
+          columns: gridMetrics.columns,
+          itemSize: gridMetrics.cellSize,
+          gapSize: gridMetrics.gap,
+          paddingSize: gridMetrics.padding,
         },
         grid.clientHeight,
       );
       if (target === null) return;
 
+      // The touch selection bar floats over the bottom of the grid; leave room
+      // for it when scrolling the last selected item into view.
+      const barOffset =
+        touchSelectionMode && edge === "bottom"
+          ? TOUCH_SELECTION_BAR_OFFSET
+          : 0;
       const scrollTop = Math.min(
-        target,
+        target + barOffset,
         Math.max(0, grid.scrollHeight - grid.clientHeight),
       );
       if (typeof grid.scrollTo === "function") {
@@ -514,35 +560,23 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
         updateSelectionOverflow();
       }
     },
-    [
-      gridDimensions.cols,
-      selectionIndex,
-      thumbnailSize,
-      updateSelectionOverflow,
-    ],
+    [gridMetrics, selectionIndex, touchSelectionMode, updateSelectionOverflow],
   );
 
   const handleRecalculateRenderView = useCallback(
-    (
-      filesLength: number,
-      gridDimensions: { rows: number; cols: number },
-      thumbnailSize: number,
-    ) => {
+    (filesLength: number, metrics: GridMetrics) => {
       if (!useVirtualViewport) return;
       if (!gridRef.current) return;
-      const { rows, cols } = gridDimensions;
-      const actualItemHeight = thumbnailSize;
+      const { rows, columns, cellSize, gap, padding } = metrics;
+      const rowSize = cellSize + gap;
       const maxRow = Math.max(0, rows - 1);
       const firstRow = Math.min(
         maxRow,
         Math.max(
           0,
           Math.ceil(
-            (-SCROLL_SLACK +
-              gridRef.current.scrollTop -
-              GAP_SIZE -
-              actualItemHeight) /
-              (actualItemHeight + GAP_SIZE),
+            (-SCROLL_SLACK + gridRef.current.scrollTop - padding - cellSize) /
+              rowSize,
           ),
         ),
       );
@@ -554,16 +588,16 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
             (SCROLL_SLACK +
               gridRef.current.scrollTop +
               gridRef.current.parentElement!.clientHeight -
-              GAP_SIZE) /
-              (actualItemHeight + GAP_SIZE),
+              padding) /
+              rowSize,
           ),
         ),
       );
       const topRows = firstRow;
       const bottomRows = maxRow - lastRow;
-      const firstIndex = firstRow * cols;
-      const lastIndex = Math.min((lastRow + 1) * cols, filesLength);
-      const viewHeight = rows * (thumbnailSize + GAP_SIZE) + GAP_SIZE;
+      const firstIndex = firstRow * columns;
+      const lastIndex = Math.min((lastRow + 1) * columns, filesLength);
+      const viewHeight = rows * rowSize + padding * 2 - gap;
       setRenderView((currentView) => {
         if (
           currentView.firstIndex === firstIndex &&
@@ -589,16 +623,22 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
   useLayoutEffect(() => {
     const calculateDimensions = () => {
       if (!gridRef.current) return;
-      const width = gridRef.current.clientWidth - 32; // Account for container padding
-      const cols = Math.max(1, Math.floor(width / (thumbnailSize + GAP_SIZE)));
-      const rows = Math.ceil(fileIds.length / cols);
-      setGridDimensions({ cols, rows });
-      handleRecalculateRenderView(
+      const nextMetrics = computeGridMetrics(
+        gridRef.current.clientWidth,
         fileIds.length,
-        { cols, rows },
         thumbnailSize,
+        isCompactLayout,
       );
-      updateSelectionOverflow();
+      setGridMetrics((currentMetrics) =>
+        currentMetrics.columns === nextMetrics.columns &&
+        currentMetrics.rows === nextMetrics.rows &&
+        currentMetrics.cellSize === nextMetrics.cellSize &&
+        currentMetrics.gap === nextMetrics.gap &&
+        currentMetrics.padding === nextMetrics.padding
+          ? currentMetrics
+          : nextMetrics,
+      );
+      handleRecalculateRenderView(fileIds.length, nextMetrics);
     };
 
     calculateDimensions();
@@ -624,8 +664,8 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
   }, [
     fileIds.length,
     handleRecalculateRenderView,
+    isCompactLayout,
     thumbnailSize,
-    updateSelectionOverflow,
   ]);
 
   useLayoutEffect(() => {
@@ -793,7 +833,107 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     };
   }, [pageKey, clearSelectedFiles, setActiveFileId]);
 
+  const toggleTouchSelection = useCallback(
+    (fileId: number) => {
+      const state = usePageStore.getState();
+      const currentSelection = state.selectedFilesByPage[pageKey] || [];
+      const currentActive = state.activeFileByPage[pageKey] ?? null;
+
+      if (currentSelection.includes(fileId)) {
+        const nextSelection = currentSelection.filter((id) => id !== fileId);
+        setSelectedFiles(pageKey, nextSelection, { offerRestore: false });
+        if (currentActive === fileId) {
+          setActiveFileId(
+            pageKey,
+            nextSelection[nextSelection.length - 1] ?? null,
+          );
+        }
+      } else {
+        setSelectedFiles(pageKey, [...currentSelection, fileId], {
+          offerRestore: false,
+        });
+        setActiveFileId(pageKey, fileId);
+      }
+    },
+    [pageKey, setActiveFileId, setSelectedFiles],
+  );
+
+  const exitTouchSelection = useCallback(() => {
+    setTouchSelectionMode(false);
+    clearSelectedFiles(pageKey, { offerRestore: false });
+    setActiveFileId(pageKey, null);
+  }, [clearSelectedFiles, pageKey, setActiveFileId]);
+
+  const handleFileLongPress = useCallback(
+    (event: React.PointerEvent) => {
+      if (useContextMenuStore.getState().isOpen) {
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const fileItem = target.closest("[data-file-id]");
+      const fileId = Number(fileItem?.getAttribute("data-file-id"));
+      if (!fileItem || !Number.isFinite(fileId)) {
+        return;
+      }
+
+      navigator.vibrate?.(10);
+
+      if (touchSelectionMode) {
+        toggleTouchSelection(fileId);
+        return;
+      }
+
+      setTouchSelectionMode(true);
+      setSelectedFiles(pageKey, [fileId], { offerRestore: false });
+      setActiveFileId(pageKey, fileId);
+    },
+    [
+      pageKey,
+      setActiveFileId,
+      setSelectedFiles,
+      toggleTouchSelection,
+      touchSelectionMode,
+    ],
+  );
+
+  const { consumeClickSuppression, ...longPressHandlers } = useLongPress(
+    handleFileLongPress,
+    { delay: 500, moveThreshold: 10 },
+  );
+
+  const openFileViewer = (fileId: number) => {
+    const fileIndex = fileIdToIndex.get(fileId);
+    if (fileIndex !== undefined) {
+      pendingViewerSelectionRef.current = null;
+      setModalIndex(fileIndex);
+    }
+  };
+
+  const handleFileTouchTap = (fileId: number) => {
+    if (touchSelectionMode) {
+      toggleTouchSelection(fileId);
+      return;
+    }
+    openFileViewer(fileId);
+  };
+
   const handleFileClick = (fileId: number, event: React.MouseEvent) => {
+    // Touch and pen taps are handled separately from mouse clicks. The
+    // pointerdown that produced this click is recorded by the grid viewport.
+    if (event.detail > 0 && isTouchPointerType(lastPointerTypeRef.current)) {
+      event.preventDefault();
+      // The first click of a touch sequence performs the action; later
+      // synthesized clicks/double-clicks are ignored.
+      if (event.detail > 1 || consumeClickSuppression()) {
+        return;
+      }
+      handleFileTouchTap(fileId);
+      return;
+    }
+
     if (event.detail > 1) {
       return;
     }
@@ -838,17 +978,22 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
   };
 
   const handleFileDoubleClick = (fileId: number) => {
-    // Double click - open modal
-    const fileIndex = fileIdToIndex.get(fileId);
-    if (fileIndex !== undefined) {
-      pendingViewerSelectionRef.current = null;
-      setModalIndex(fileIndex);
+    // Touch uses a single tap to open the viewer; ignore the synthetic
+    // double-click some browsers emit after two quick taps.
+    if (isTouchPointerType(lastPointerTypeRef.current)) {
+      return;
     }
-    return;
+    // Double click - open modal
+    openFileViewer(fileId);
   };
 
   const handleViewContextMenu = (event: React.MouseEvent) => {
     event.preventDefault();
+    // Long-press on touch devices emits a native contextmenu event. Suppress
+    // it there; right-click with a mouse still opens the view menu.
+    if (contextMenuCameFromTouch(event, lastPointerTypeRef.current)) {
+      return;
+    }
     showContextMenu(event, viewMenuWithUtilityItems);
   };
 
@@ -856,6 +1001,19 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     event.preventDefault();
     event.stopPropagation();
 
+    // Long-press on touch devices emits a native contextmenu event. Touch
+    // users reach this menu through the selection bar instead.
+    if (contextMenuCameFromTouch(event, lastPointerTypeRef.current)) {
+      return;
+    }
+
+    openFileContextMenu({ x: event.clientX, y: event.clientY }, fileId);
+  };
+
+  const openFileContextMenu = (
+    position: { x: number; y: number },
+    fileId: number,
+  ) => {
     let selectedFiles = selectedFilesByPage[pageKey] || [];
     const fileWasSelected = isFileSelected(fileId);
 
@@ -873,7 +1031,7 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     );
 
     // Show context menu
-    showContextMenu(event, [
+    useContextMenuStore.getState().actions.openMenu(position, [
       {
         id: "open-new-tab",
         label: "Open in New Tab",
@@ -1394,29 +1552,58 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     ]);
   };
 
-  const longPressHandlers = useLongPress((event) => {
-    if (
-      !useContextMenuStore.getState().isOpen &&
-      event.target &&
-      event.target instanceof Element
-    ) {
-      let target: Element | null = event.target;
-      while (target) {
-        if (target.hasAttribute("data-file-id")) {
-          break;
-        }
-        target = target.parentElement;
-      }
-      if (!target) {
-        return;
-      }
-      const fileId = target.getAttribute("data-file-id");
-      if (!fileId) {
-        return;
-      }
-      handleFileContextMenu(event, Number(fileId));
+  // Selection mode ends when the selection becomes empty, or when the page
+  // changes.
+  useEffect(() => {
+    if (touchSelectionMode && selectedFiles.length === 0) {
+      setTouchSelectionMode(false);
     }
-  });
+  }, [selectedFiles.length, touchSelectionMode]);
+
+  const previousPageKeyRef = useRef(pageKey);
+  useEffect(() => {
+    if (previousPageKeyRef.current === pageKey) {
+      return;
+    }
+    previousPageKeyRef.current = pageKey;
+    setTouchSelectionMode(false);
+  }, [pageKey]);
+
+  // Escape exits touch selection mode (nice-to-have back-gesture equivalent).
+  useEffect(() => {
+    if (!touchSelectionMode) {
+      return;
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      if (useContextMenuStore.getState().isOpen) {
+        return;
+      }
+      event.preventDefault();
+      exitTouchSelection();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [exitTouchSelection, touchSelectionMode]);
+
+  const openSelectionActions = () => {
+    const fileId =
+      activeFileId != null && selectedFiles.includes(activeFileId)
+        ? activeFileId
+        : selectedFiles[0];
+    if (fileId === undefined) {
+      return;
+    }
+
+    // Anchor the existing file context menu to the Actions button.
+    const rect = actionsButtonRef.current?.getBoundingClientRect();
+    openFileContextMenu(
+      { x: rect ? rect.left + rect.width / 2 : 0, y: rect ? rect.top : 0 },
+      fileId,
+    );
+  };
 
   // Modal navigation handlers
   const handleModalClose = () => {
@@ -1463,7 +1650,7 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     if (currentIndex === undefined) return;
 
     let nextIndex: number | null = null;
-    const { cols } = gridDimensions;
+    const cols = gridMetrics.columns;
 
     switch (event.key) {
       case "ArrowLeft":
@@ -1627,16 +1814,14 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       };
 
       const selectedFiles: number[] = [];
-      const { cols } = gridDimensions;
+      const { columns: cols, cellSize, gap, padding } = gridMetrics;
+      const rowSize = cellSize + gap;
       const maxRow = Math.max(0, Math.ceil(fileIds.length / cols) - 1);
       const firstRow = Math.min(
         maxRow,
         Math.max(
           0,
-          Math.ceil(
-            (selectionRect.top - GAP_SIZE - thumbnailSize) /
-              (thumbnailSize + GAP_SIZE),
-          ),
+          Math.ceil((selectionRect.top - padding - cellSize) / rowSize),
         ),
       );
       const lastRow = Math.min(
@@ -1644,14 +1829,12 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
         Math.max(
           0,
           Math.floor(
-            (selectionRect.top + selectionRect.height - GAP_SIZE) /
-              (thumbnailSize + GAP_SIZE),
+            (selectionRect.top + selectionRect.height - padding) / rowSize,
           ),
         ),
       );
-      const gridWidth = grid.clientWidth - GAP_SIZE * 2;
-      const extraWidth =
-        gridWidth - cols * thumbnailSize - (cols - 1) * GAP_SIZE;
+      const gridWidth = grid.clientWidth - padding * 2;
+      const extraWidth = gridWidth - cols * cellSize - (cols - 1) * gap;
       const horizontalGutter = extraWidth / cols / 2;
       const firstFileIndex = firstRow * cols;
       const lastFileIndex = Math.min((lastRow + 1) * cols, fileIds.length);
@@ -1664,13 +1847,12 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
         const row = Math.floor(i / cols);
         const col = i % cols;
         const fileLeft =
-          GAP_SIZE +
+          padding +
           horizontalGutter +
-          col *
-            (thumbnailSize + horizontalGutter + GAP_SIZE + horizontalGutter);
-        const fileTop = GAP_SIZE + row * (thumbnailSize + GAP_SIZE);
-        const fileRight = fileLeft + thumbnailSize;
-        const fileBottom = fileTop + thumbnailSize;
+          col * (cellSize + horizontalGutter * 2 + gap);
+        const fileTop = padding + row * rowSize;
+        const fileRight = fileLeft + cellSize;
+        const fileBottom = fileTop + cellSize;
         const intersects = !(
           fileRight < selectionRect.left ||
           fileLeft > selectionRect.left + selectionRect.width ||
@@ -1726,8 +1908,7 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       setActiveFileId,
       activeFileByPage,
       selectedFilesByPage,
-      gridDimensions,
-      thumbnailSize,
+      gridMetrics,
     ],
   );
 
@@ -1771,23 +1952,32 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
           <PageSearchBar />
         </div>
       )}
-      <div className="files-grid-viewport">
+      <div
+        className={`files-grid-viewport ${
+          touchSelectionMode ? "files-grid-viewport-touch-selection" : ""
+        }`}
+        onPointerDownCapture={(event) => {
+          // Remember what kind of pointer started the interaction. Clicks
+          // synthesized from a touch/pen tap follow this pointerdown.
+          lastPointerTypeRef.current = event.pointerType;
+        }}
+      >
         <ScrollView
           ref={gridRef}
-          className="files-grid"
+          className={`files-grid ${
+            touchSelectionMode ? "files-grid-touch-selection" : ""
+          }`}
           style={{
-            gridTemplateColumns: `repeat(${gridDimensions.cols}, minmax(${thumbnailSize}px, 1fr))`,
-            gap: `${GAP_SIZE}px`,
+            gridTemplateColumns: isCompactLayout
+              ? `repeat(${gridMetrics.columns}, minmax(0, 1fr))`
+              : `repeat(${gridMetrics.columns}, minmax(${thumbnailSize}px, 1fr))`,
+            gap: `${gridMetrics.gap}px`,
             cursor: isDragging ? "crosshair" : undefined,
           }}
           onMouseDown={handleMouseDown}
           onContextMenu={handleViewContextMenu}
           onScroll={() => {
-            handleRecalculateRenderView(
-              fileIds.length,
-              gridDimensions,
-              thumbnailSize,
-            );
+            handleRecalculateRenderView(fileIds.length, gridMetrics);
             updateSelectionOverflow();
           }}
           loaded={fileIds.length !== 0 && renderView.lastIndex !== 0}
@@ -1881,13 +2071,18 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
                         ? "file-item-active"
                         : "file-item-selected"
                       : ""
+                  } ${
+                    touchSelectionMode && isSelected
+                      ? "file-item-touch-selected"
+                      : ""
                   }`}
                   style={{
-                    width: `${thumbnailSize}px`,
-                    height: `${thumbnailSize}px`,
+                    width: `${gridMetrics.cellSize}px`,
+                    height: `${gridMetrics.cellSize}px`,
                     marginTop:
-                      useVirtualViewport && i < gridDimensions.cols
-                        ? renderView.topRows * (thumbnailSize + GAP_SIZE)
+                      useVirtualViewport && i < gridMetrics.columns
+                        ? renderView.topRows *
+                          (gridMetrics.cellSize + gridMetrics.gap)
                         : 0,
                   }}
                   onClick={(e) => handleFileClick(fileId, e)}
@@ -1907,6 +2102,14 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
                   {...longPressHandlers}
                 >
                   <Thumbnail fileId={fileId} className="thumbnail-wrapper" />
+                  {touchSelectionMode && isSelected && (
+                    <span
+                      className="file-item-selection-badge"
+                      aria-hidden="true"
+                    >
+                      <CheckIcon className="file-item-selection-badge-icon" />
+                    </span>
+                  )}
                 </div>
               );
             })
@@ -1915,11 +2118,50 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
             style={{
               pointerEvents: "none",
               paddingBottom: useVirtualViewport
-                ? renderView.bottomRows * (thumbnailSize + GAP_SIZE)
+                ? renderView.bottomRows *
+                  (gridMetrics.cellSize + gridMetrics.gap)
                 : 0,
             }}
           ></div>
         </ScrollView>
+
+        {touchSelectionMode && selectedFiles.length > 0 && (
+          <div
+            className="touch-selection-bar"
+            role="toolbar"
+            aria-label="Selection actions"
+          >
+            <button
+              type="button"
+              className="touch-selection-bar-button touch-selection-bar-exit"
+              onClick={exitTouchSelection}
+              aria-label="Exit selection mode"
+              title="Exit selection mode"
+            >
+              <XMarkIcon className="touch-selection-bar-icon" />
+            </button>
+            <span className="touch-selection-bar-count" aria-live="polite">
+              {selectedFiles.length} selected
+            </span>
+            <button
+              type="button"
+              className="touch-selection-bar-button"
+              onClick={selectAllFiles}
+            >
+              Select all
+            </button>
+            <button
+              ref={actionsButtonRef}
+              type="button"
+              className="touch-selection-bar-button touch-selection-bar-actions"
+              onClick={openSelectionActions}
+              aria-label="Actions for selected files"
+            >
+              <EllipsisHorizontalIcon className="touch-selection-bar-icon" />
+              <span>Actions</span>
+            </button>
+          </div>
+        )}
 
         {selectionOverflow.above > 0 && (
           <button

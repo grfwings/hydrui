@@ -91,3 +91,81 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Phones: opaque, sized in dvh, safe-area aware, thumb-sized controls. */
+@media (max-width: 640px) {
+  .file-viewer-modal-container {
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    background-color: #000;
+  }
+
+  .file-viewer-modal-header {
+    gap: 0.5rem;
+    padding: calc(0.5rem + var(--safe-top, 0px))
+      calc(0.5rem + var(--safe-right, 0px)) 0.5rem
+      calc(0.75rem + var(--safe-left, 0px));
+  }
+
+  .file-viewer-modal-file-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: var(--text-xs, 0.75rem);
+  }
+
+  .file-viewer-modal-actions {
+    flex: 0 0 auto;
+    gap: 0.125rem;
+  }
+
+  .file-viewer-modal-content {
+    min-height: 0;
+    padding-bottom: var(--safe-bottom, 0px);
+  }
+
+  /* Keep the arrows out of the way of the media, but still easy to hit. */
+  .file-viewer-modal-nav-button {
+    padding: 0.375rem;
+    background-color: rgba(0, 0, 0, 0.3);
+    opacity: 0.65;
+  }
+
+  .file-viewer-modal-prev-button {
+    left: 0.25rem;
+  }
+
+  .file-viewer-modal-next-button {
+    right: 0.25rem;
+  }
+
+  .file-viewer-modal-large-icon {
+    height: 1.5rem;
+    width: 1.5rem;
+  }
+}
+
+@media (pointer: coarse) {
+  .file-viewer-modal-container {
+    background-color: #000;
+  }
+
+  .file-viewer-modal-action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+  }
+
+  .file-viewer-modal-nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+  }
+}

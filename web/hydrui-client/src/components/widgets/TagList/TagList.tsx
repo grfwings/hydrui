@@ -15,6 +15,7 @@ import TagLabel from "@/components/widgets/TagLabel/TagLabel";
 import { ContentUpdateAction } from "@/constants/contentUpdates";
 import { REAL_TAG_SERVICES } from "@/constants/services";
 import { useContextMenu } from "@/hooks/useContextMenu";
+import { useIsCoarsePointer } from "@/hooks/useMediaQuery";
 import { client } from "@/store/apiStore";
 import {
   SEARCH_PAGE_KEY,
@@ -43,15 +44,14 @@ const SCROLL_SLACK = 200;
 // Number of files to process during tag counting before yielding.
 const COUNT_YIELD_INTERVAL = 1000;
 
-// Height of a tag list entry, in pixels.
+// Height of a tag list entry, in pixels. The touch height must match the
+// `@media (pointer: coarse)` rule in index.css because the virtual viewport
+// maths below depends on it.
 const TAG_LIST_ENTRY_HEIGHT = 24;
+const TAG_LIST_ENTRY_HEIGHT_TOUCH = 44;
 
 // Margin of a tag list entry, in pixels.
 const TAG_LIST_ENTRY_MARGIN = 4;
-
-// Height of a tag list entry with margin.
-const TAG_LIST_ENTRY_FULL_HEIGHT =
-  TAG_LIST_ENTRY_HEIGHT + TAG_LIST_ENTRY_MARGIN;
 
 async function getTagCounts(files: FileMetadata[], useDisplay: boolean) {
   const fileTagCounts = new Map<string, Set<number>>();
@@ -117,6 +117,10 @@ function TagList({ style }: { style?: CSSProperties | undefined }) {
     searchTags,
   } = useSearchStore();
   const { useVirtualViewport } = usePreferencesStore();
+  const isCoarsePointer = useIsCoarsePointer();
+  const tagEntryFullHeight =
+    (isCoarsePointer ? TAG_LIST_ENTRY_HEIGHT_TOUCH : TAG_LIST_ENTRY_HEIGHT) +
+    TAG_LIST_ENTRY_MARGIN;
   const selectedFiles = useMemo(() => {
     if (loadedFileCount) {
       // Dummy dependency. For performance reasons we re-use the same sparse
@@ -196,10 +200,8 @@ function TagList({ style }: { style?: CSSProperties | undefined }) {
         Math.max(
           0,
           Math.ceil(
-            (-SCROLL_SLACK +
-              listRef.current.scrollTop -
-              TAG_LIST_ENTRY_FULL_HEIGHT) /
-              TAG_LIST_ENTRY_FULL_HEIGHT,
+            (-SCROLL_SLACK + listRef.current.scrollTop - tagEntryFullHeight) /
+              tagEntryFullHeight,
           ),
         ),
       );
@@ -211,7 +213,7 @@ function TagList({ style }: { style?: CSSProperties | undefined }) {
             (SCROLL_SLACK +
               listRef.current.scrollTop +
               listRef.current.parentElement!.clientHeight) /
-              TAG_LIST_ENTRY_FULL_HEIGHT,
+              tagEntryFullHeight,
           ),
         ),
       );
@@ -224,7 +226,7 @@ function TagList({ style }: { style?: CSSProperties | undefined }) {
         bottomRows,
       });
     },
-    [useVirtualViewport],
+    [useVirtualViewport, tagEntryFullHeight],
   );
 
   useLayoutEffect(() => {
@@ -572,7 +574,7 @@ function TagList({ style }: { style?: CSSProperties | undefined }) {
                 <li
                   style={{
                     visibility: "hidden",
-                    height: renderView.topRows * TAG_LIST_ENTRY_FULL_HEIGHT,
+                    height: renderView.topRows * tagEntryFullHeight,
                     margin: "0px",
                     padding: "0px",
                   }}
@@ -596,7 +598,7 @@ function TagList({ style }: { style?: CSSProperties | undefined }) {
                 <li
                   style={{
                     visibility: "hidden",
-                    height: renderView.bottomRows * TAG_LIST_ENTRY_FULL_HEIGHT,
+                    height: renderView.bottomRows * tagEntryFullHeight,
                     margin: "0px",
                     padding: "0px",
                   }}

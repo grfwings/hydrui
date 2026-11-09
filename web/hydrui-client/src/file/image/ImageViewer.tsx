@@ -22,6 +22,7 @@ interface ImageViewerProps {
 
   showAnnotations: boolean;
   onAnnotationDirtyChange?: ((dirty: boolean) => void) | undefined;
+  onZoomChange?: ((zoomed: boolean) => void) | undefined;
 
   navigateLeft?: (() => void) | undefined;
   navigateRight?: (() => void) | undefined;
@@ -51,6 +52,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   fileUrl,
   showAnnotations,
   onAnnotationDirtyChange,
+  onZoomChange,
   navigateLeft,
   navigateRight,
 }) => {
@@ -79,6 +81,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     resetView();
     setIsImageLoaded(false);
   }, [fileId, fileUrl]);
+
+  // Let a parent (e.g. the Archive/Delete filter) know when panning owns the
+  // gesture so its own swipe handling can stand down.
+  const isZoomed = scale > 1;
+  useEffect(() => {
+    onZoomChange?.(isZoomed);
+  }, [isZoomed, onZoomChange]);
 
   useEffect(() => {
     if (fileData.width && fileData.height) {
@@ -459,8 +468,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
       // Check for edge navigation with swipe
       const swipeThreshold = 200;
+      const canEdgeNavigate = Boolean(navigateLeft || navigateRight);
 
-      if (scale <= 1) {
+      if (scale <= 1 && canEdgeNavigate) {
         setEdgeTranslationX((x) => x + deltaX);
 
         if (edgeTranslationX > 0 && !navigateLeft) {
@@ -493,7 +503,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         } else if (edgeTranslationX < 0 && edgeTranslationX > -swipeThreshold) {
           setIsTransitioning(false);
         }
-      } else {
+      } else if (scale > 1) {
+        // Panning a zoomed image always belongs to the viewer. When there is
+        // nowhere to edge-navigate to and the image is not zoomed, the gesture
+        // is left for a parent such as the Archive/Delete filter.
         setTranslateX((prev) => {
           const newX = prev + deltaX;
           const [constrainedX] = constrainPan(newX, translateY, scale);

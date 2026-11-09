@@ -1,3 +1,4 @@
+import { XMarkIcon } from "@heroicons/react/24/solid";
 import { FocusTrap } from "focus-trap-react";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 
@@ -53,22 +54,29 @@ const SetViewerOverrideModalModal: React.FC<
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="set-viewer-override-modal-container">
-        <div className="set-viewer-override-modal-wrapper">
+        <div className="set-viewer-override-modal-wrapper modal-shell modal-sheet">
           <div
             className="set-viewer-override-modal-backdrop"
             onClick={onClose}
           />
 
-          <div className="set-viewer-override-modal-content">
+          <div className="set-viewer-override-modal-content modal-panel">
             {/* Header */}
-            <div className="set-viewer-override-modal-header">
+            <div className="set-viewer-override-modal-header modal-panel-head">
               <h3 className="set-viewer-override-modal-title">
                 Viewer Override For {filetypeEnumToString.get(fileType)}
               </h3>
+              <button
+                onClick={onClose}
+                className="modal-close modal-close-compact"
+                aria-label="Close"
+              >
+                <XMarkIcon />
+              </button>
             </div>
 
             {/* Content */}
-            <div className="set-viewer-override-modal-body">
+            <div className="set-viewer-override-modal-body modal-panel-scroll">
               <div className="set-viewer-override-modal-viewer-input-container">
                 <select
                   className="set-viewer-override-modal-viewer-input"
@@ -96,7 +104,7 @@ const SetViewerOverrideModalModal: React.FC<
             </div>
 
             {/* Footer */}
-            <div className="set-viewer-override-modal-footer">
+            <div className="set-viewer-override-modal-footer modal-panel-foot">
               <PushButton onClick={onClose} variant="secondary">
                 Cancel
               </PushButton>

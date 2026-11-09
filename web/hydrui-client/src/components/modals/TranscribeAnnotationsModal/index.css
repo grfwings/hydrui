@@ -1,3 +1,5 @@
+@import "../modal-shared.css";
+
 .transcribe-annotations-modal-container {
   position: fixed;
   inset: 0;
@@ -10,6 +12,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 1rem;
 }
 
@@ -27,6 +30,7 @@
   width: 100%;
   max-width: var(--container-4xl);
   max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   overflow: hidden;
   border: 1px solid var(--color-gray-700);
   border-radius: var(--radius-lg);
@@ -166,25 +170,18 @@
   margin-left: auto;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .transcribe-annotations-modal-scopes {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 520px) {
-  .transcribe-annotations-modal-wrapper {
-    align-items: flex-start;
-    padding: 0.5rem;
-  }
-
-  .transcribe-annotations-modal-content {
-    max-height: calc(100vh - 1rem);
   }
 
   .transcribe-annotations-modal-provider,
   .transcribe-annotations-modal-section .provider-transcription-options-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.375rem;
+  }
+
+  .transcribe-annotations-modal-footer > div {
+    flex: 1 1 auto;
   }
 }

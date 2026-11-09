@@ -1,12 +1,14 @@
+import { FocusTrap } from "focus-trap-react";
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { useIsCompactLayout } from "@/hooks/useMediaQuery";
 import {
   useContextMenuActions,
   useContextMenuStore,
 } from "@/store/contextMenuStore";
 
-import MenuList from "./MenuList";
+import MenuList, { DrillInMenuList } from "./MenuList";
 import "./index.css";
 
 const ContextMenu: React.FC = () => {
@@ -14,6 +16,7 @@ const ContextMenu: React.FC = () => {
   const isOpen = useContextMenuStore((state) => state.isOpen);
   const position = useContextMenuStore((state) => state.position);
   const items = useContextMenuStore((state) => state.items);
+  const isCompact = useIsCompactLayout();
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenuPath, setActiveSubmenuPath] = useState<string[]>([]);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({
@@ -70,9 +73,9 @@ const ContextMenu: React.FC = () => {
     };
   }, [isOpen, closeMenu, activeSubmenuPath]);
 
-  // Calculate menu position
+  // Calculate menu position (desktop flyout only)
   useEffect(() => {
-    if (isOpen && position && menuRef.current) {
+    if (!isCompact && isOpen && position && menuRef.current) {
       const menu = menuRef.current;
       const { x, y } = position;
       const { innerWidth, innerHeight } = window;
@@ -111,13 +114,56 @@ const ContextMenu: React.FC = () => {
         left: finalX,
         top: finalY,
         opacity: 1,
-        maxHeight: "100vh",
+        // Only cap the height when the menu genuinely cannot fit, so menus that
+        // fit exactly keep their previous desktop appearance.
+        maxHeight:
+          finalY + height > innerHeight
+            ? `${innerHeight - finalY}px`
+            : undefined,
       });
     }
-  }, [isOpen, position]);
+  }, [isCompact, isOpen, position]);
 
   if (!isOpen || !position) {
     return null;
+  }
+
+  if (isCompact) {
+    return createPortal(
+      <div className="context-menu-sheet-root">
+        <div
+          className="context-menu-sheet-backdrop"
+          onClick={closeMenu}
+          aria-hidden="true"
+        />
+        <FocusTrap
+          focusTrapOptions={{
+            allowOutsideClick: true,
+            escapeDeactivates: false,
+            initialFocus: () =>
+              menuRef.current?.querySelector<HTMLElement>(".menu-list") ??
+              false,
+          }}
+        >
+          <div
+            ref={menuRef}
+            className="context-menu context-menu-sheet"
+            role="presentation"
+          >
+            <div className="context-menu-sheet-grab" aria-hidden="true" />
+            <div className="context-menu-sheet-content">
+              <DrillInMenuList
+                items={items}
+                activeSubmenuPath={activeSubmenuPath}
+                setActiveSubmenuPath={setActiveSubmenuPath}
+                onClose={closeMenu}
+              />
+            </div>
+          </div>
+        </FocusTrap>
+      </div>,
+      document.body,
+    );
   }
 
   return createPortal(

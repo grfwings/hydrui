@@ -8,6 +8,40 @@
   display: flex;
   overflow-x: auto;
   border-bottom: 1px solid var(--color-gray-600);
+  scrollbar-width: thin;
+}
+
+.tab-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
+/* Touch: let the strip scroll without a persistent scrollbar or overscroll
+   bounce, and make rows comfortably tall. */
+@media (max-width: 640px), (pointer: coarse) {
+  .tab-bar {
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-item {
+    min-height: var(--touch-target, 44px);
+  }
+
+  /* Keep the visual icon small but give the close control a full 44px hit
+     area without growing the tab. */
+  .tab-close-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+    margin: -0.5rem -0.75rem -0.5rem -0.25rem;
+  }
 }
 
 .tab-item {

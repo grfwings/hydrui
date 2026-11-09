@@ -135,3 +135,16 @@
     gap: 0.125rem;
   }
 }
+
+@media (pointer: coarse) {
+  .system-prompt-input-actions button {
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+    justify-content: center;
+  }
+
+  .system-prompt-input > textarea,
+  .system-prompt-input-history > button {
+    font-size: 1rem;
+  }
+}

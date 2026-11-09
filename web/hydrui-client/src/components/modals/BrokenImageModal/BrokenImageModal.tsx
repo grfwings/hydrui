@@ -1,3 +1,4 @@
+import { XMarkIcon } from "@heroicons/react/24/solid";
 import { FocusTrap } from "focus-trap-react";
 import React, { useCallback, useState } from "react";
 
@@ -73,15 +74,22 @@ const BrokenImageModal: React.FC<BrokenImageModalProps> = ({
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="broken-image-modal-container">
-        <div className="broken-image-modal-wrapper">
+        <div className="broken-image-modal-wrapper modal-shell modal-sheet">
           <div className="broken-image-modal-backdrop" onClick={onClose} />
 
-          <div className="broken-image-modal-content">
-            <div className="broken-image-modal-header">
+          <div className="broken-image-modal-content modal-panel">
+            <div className="broken-image-modal-header modal-panel-head">
               <h3 className="broken-image-modal-title">Broken Image</h3>
+              <button
+                onClick={onClose}
+                className="modal-close modal-close-compact"
+                aria-label="Close"
+              >
+                <XMarkIcon />
+              </button>
             </div>
 
-            <div className="broken-image-modal-body">
+            <div className="broken-image-modal-body modal-panel-scroll">
               <p className="broken-image-modal-message">
                 The Hydrui PSD viewer is experimental. We&rsquo;re working on
                 improving the accuracy, but it&rsquo;s challenging due to the
@@ -125,7 +133,7 @@ const BrokenImageModal: React.FC<BrokenImageModalProps> = ({
               </PushButton>
             </div>
 
-            <div className="broken-image-modal-footer">
+            <div className="broken-image-modal-footer modal-panel-foot">
               <PushButton onClick={onClose} variant="secondary">
                 Close
               </PushButton>

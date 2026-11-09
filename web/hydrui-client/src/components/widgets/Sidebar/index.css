@@ -14,3 +14,31 @@
 .sidebar-divider:hover {
   background-color: var(--color-gray-700);
 }
+
+/* Stacked variant used inside the phone bottom sheet: the tag list gets its
+   own bounded scroll area and the preview follows naturally below it. */
+.sidebar-container-stacked {
+  height: auto;
+}
+
+.sidebar-stacked-tags {
+  display: flex;
+  flex-direction: column;
+  max-height: 45dvh;
+}
+
+.sidebar-container-stacked .tag-list-container {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sidebar-container-stacked .file-preview-container {
+  flex: none;
+  overflow: visible;
+}
+
+.sidebar-container-stacked .file-preview-viewer {
+  flex: none;
+  height: 30dvh;
+  min-height: 120px;
+}

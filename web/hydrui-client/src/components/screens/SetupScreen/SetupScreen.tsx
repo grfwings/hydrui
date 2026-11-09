@@ -101,6 +101,12 @@ const SetupScreen: React.FC = () => {
               className="setup-input"
               placeholder="Hydrus API URL, e.g. http://localhost:45869"
               required
+              inputMode="url"
+              autoComplete="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="next"
             />
           </div>
 
@@ -117,6 +123,11 @@ const SetupScreen: React.FC = () => {
               className="setup-input"
               placeholder="Hydrus API key"
               required
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="go"
             />
             <p className="setup-help-text">
               You can find this in hydrus client under Services &gt; Review

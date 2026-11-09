@@ -427,25 +427,26 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="edit-tags-modal-container">
-        <div className="edit-tags-modal-wrapper">
+        <div className="edit-tags-modal-wrapper modal-shell modal-full">
           <div className="edit-tags-modal-backdrop" onClick={handleClose} />
 
-          <div className="edit-tags-modal-content">
+          <div className="edit-tags-modal-content modal-panel">
             {/* Header */}
-            <div className="edit-tags-modal-header">
+            <div className="edit-tags-modal-header modal-panel-head">
               <h2 className="edit-tags-modal-title">
                 Edit Tags ({files.length} file{files.length !== 1 ? "s" : ""})
               </h2>
               <button
                 onClick={handleClose}
-                className="edit-tags-modal-close-button"
+                className="edit-tags-modal-close-button modal-close"
+                aria-label="Close"
               >
                 <XMarkIcon className="edit-tags-modal-close-icon" />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="edit-tags-modal-tabs">
+            <div className="edit-tags-modal-tabs modal-panel-tabs">
               <div className="edit-tags-modal-tabs-list">
                 <button
                   onClick={() => setActiveTab("edit")}
@@ -481,12 +482,12 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
             </div>
 
             {/* Content */}
-            <div className="edit-tags-modal-content-area">
+            <div className="edit-tags-modal-content-area modal-panel-scroll">
               {/* Edit tab */}
               {activeTab === "edit" && (
                 <>
                   {/* Service tabs */}
-                  <div className="edit-tags-modal-service-tabs">
+                  <div className="edit-tags-modal-service-tabs modal-panel-tabs">
                     <div className="edit-tags-modal-service-tabs-list">
                       {tagServices.map((service) => (
                         <button
@@ -735,7 +736,7 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
             </div>
 
             {/* Footer */}
-            <div className="edit-tags-modal-footer">
+            <div className="edit-tags-modal-footer modal-panel-foot">
               <div className="edit-tags-modal-footer-content">
                 {error ? (
                   <div className="edit-tags-modal-error">{error}</div>

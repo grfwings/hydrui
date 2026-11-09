@@ -36,14 +36,19 @@ const MenuBarItem: React.FC<MenuBarItemProps> = ({
   useEffect(() => {
     if (isOpen && menuRef.current) {
       const rect = menuRef.current.getBoundingClientRect();
-      const { innerHeight } = window;
+      const { innerWidth, innerHeight } = window;
+
+      // Keep the dropdown inside the viewport: shift it left when it would run
+      // off the right edge, and cap its width/height with internal scrolling.
+      const left = Math.max(8, Math.min(rect.left, innerWidth - 208));
 
       setMenuStyle({
         position: "fixed",
-        left: rect.left,
+        left,
         top: rect.bottom,
         opacity: 1,
-        maxHeight: `${innerHeight - rect.bottom}px`,
+        maxHeight: `${Math.max(120, innerHeight - rect.bottom - 8)}px`,
+        maxWidth: `${Math.max(160, innerWidth - left - 8)}px`,
       });
     }
 

@@ -177,6 +177,9 @@
   height: 100%;
   overflow: hidden;
   position: relative;
+  /* The viewer owns pan/zoom; keep the browser from stealing the gesture. */
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 .image-viewer-img {

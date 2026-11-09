@@ -59,3 +59,13 @@
   color: var(--color-gray-400);
   font-style: italic;
 }
+
+@media (pointer: coarse) {
+  .model-input-field {
+    font-size: 1rem;
+  }
+
+  .model-input-suggestion-item {
+    min-height: var(--touch-target, 44px);
+  }
+}

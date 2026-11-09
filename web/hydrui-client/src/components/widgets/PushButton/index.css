@@ -68,3 +68,9 @@
 .push-button.muted:disabled {
   color: var(--color-gray-100);
 }
+
+@media (pointer: coarse) {
+  .push-button {
+    min-height: var(--touch-target, 44px);
+  }
+}

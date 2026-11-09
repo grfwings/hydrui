@@ -194,26 +194,27 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="batch-autotag-modal-container">
-        <div className="batch-autotag-modal-wrapper">
+        <div className="batch-autotag-modal-wrapper modal-shell modal-full">
           <div className="batch-autotag-modal-backdrop" onClick={onClose} />
 
-          <div className="batch-autotag-modal-content">
+          <div className="batch-autotag-modal-content modal-panel">
             {/* Header */}
-            <div className="batch-autotag-modal-header">
+            <div className="batch-autotag-modal-header modal-panel-head">
               <h2 className="batch-autotag-modal-title">
                 Batch Autotag ({files.length} file
                 {files.length !== 1 ? "s" : ""})
               </h2>
               <button
                 onClick={onClose}
-                className="batch-autotag-modal-close-button"
+                className="batch-autotag-modal-close-button modal-close"
+                aria-label="Close"
               >
                 <XMarkIcon className="batch-autotag-modal-close-icon" />
               </button>
             </div>
 
             {/* Content */}
-            <div className="batch-autotag-modal-content-area">
+            <div className="batch-autotag-modal-content-area modal-panel-scroll">
               <div className="batch-autotag-modal-form">
                 <div className="batch-autotag-modal-form-row">
                   <p>
@@ -281,6 +282,7 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
                       onChange={(e) =>
                         setAutotagThreshold(Number(e.currentTarget.value))
                       }
+                      inputMode="decimal"
                     />
                     <input
                       className="batch-autotag-modal-range-input"
@@ -299,7 +301,7 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="batch-autotag-modal-footer">
+            <div className="batch-autotag-modal-footer modal-panel-foot">
               <div className="batch-autotag-modal-footer-content">
                 <div className="batch-autotag-modal-footer-buttons">
                   <PushButton onClick={onClose} variant="secondary">

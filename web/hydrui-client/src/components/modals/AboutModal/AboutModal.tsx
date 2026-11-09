@@ -22,31 +22,31 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="about-modal-container">
-        <div className="about-modal-wrapper">
+        <div className="about-modal-wrapper modal-shell modal-sheet">
           {/* Backdrop */}
           <div className="about-modal-backdrop" onClick={onClose} />
 
           {/* Modal */}
-          <div className="about-modal-content">
+          <div className="about-modal-content modal-panel">
             <div className="about-modal-cube-container">
               <ErrorBoundary fallback={<div className="w-[250px] h-[250px]" />}>
                 <SpinningCube width={250} height={250} />
               </ErrorBoundary>
             </div>
 
-            <div className="about-modal-content-wrapper">
-              <div className="about-modal-header">
+            <div className="about-modal-content-wrapper modal-panel-content">
+              <div className="about-modal-header modal-panel-head">
                 <h2 className="about-modal-title">About Hydrui</h2>
                 <button
                   onClick={onClose}
-                  className="about-modal-close-button"
+                  className="about-modal-close-button modal-close"
                   aria-label="Close"
                 >
                   <XMarkIcon className="about-modal-close-icon" />
                 </button>
               </div>
 
-              <div className="about-modal-body">
+              <div className="about-modal-body modal-panel-scroll">
                 <p>Hydrui is a web interface for the hydrus network.</p>
 
                 <div className="about-modal-section">
@@ -83,7 +83,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                 </p>
               </div>
             </div>
-            <div className="about-modal-footer">
+            <div className="about-modal-footer modal-panel-foot">
               <PushButton onClick={onClose}>Thanks, Shitman!</PushButton>
             </div>
           </div>

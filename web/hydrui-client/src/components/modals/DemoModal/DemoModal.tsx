@@ -19,25 +19,25 @@ const DemoModal: React.FC<DemoModalProps> = ({ onClose }) => {
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="demo-modal-container">
-        <div className="demo-modal-wrapper">
+        <div className="demo-modal-wrapper modal-shell modal-sheet">
           {/* Backdrop */}
           <div className="demo-modal-backdrop" onClick={onClose} />
 
           {/* Modal */}
-          <div className="demo-modal-content">
-            <div className="demo-modal-content-wrapper">
-              <div className="demo-modal-header">
+          <div className="demo-modal-content modal-panel">
+            <div className="demo-modal-content-wrapper modal-panel-content">
+              <div className="demo-modal-header modal-panel-head">
                 <h2 className="demo-modal-title">About This Demo</h2>
                 <button
                   onClick={onClose}
-                  className="demo-modal-close-button"
+                  className="demo-modal-close-button modal-close"
                   aria-label="Close"
                 >
                   <XMarkIcon className="demo-modal-close-icon" />
                 </button>
               </div>
 
-              <div className="demo-modal-body">
+              <div className="demo-modal-body modal-panel-scroll">
                 <p>This is a local-only demo of Hydrui.</p>
                 <p>
                   <b>
@@ -67,7 +67,7 @@ const DemoModal: React.FC<DemoModalProps> = ({ onClose }) => {
                 </p>
               </div>
             </div>
-            <div className="demo-modal-footer">
+            <div className="demo-modal-footer modal-panel-foot">
               <PushButton onClick={onClose}>Dismiss</PushButton>
             </div>
           </div>

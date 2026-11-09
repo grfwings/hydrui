@@ -201,18 +201,18 @@ const TranscriptModalContent: React.FC<TranscriptModalContentProps> = ({
         onTouchEnd={stopPropagation}
         onWheel={stopPropagation}
       >
-        <div className="transcription-transcript-modal-wrapper">
+        <div className="transcription-transcript-modal-wrapper modal-shell modal-full">
           <div
             className="transcription-transcript-modal-backdrop"
             onClick={close}
           />
           <div
-            className="transcription-transcript-modal-content"
+            className="transcription-transcript-modal-content modal-panel"
             role="dialog"
             aria-modal="true"
             aria-labelledby="transcription-transcript-title"
           >
-            <header className="transcription-transcript-modal-header">
+            <header className="transcription-transcript-modal-header modal-panel-head">
               <div>
                 <h2 id="transcription-transcript-title">
                   Transcription transcript
@@ -229,12 +229,13 @@ const TranscriptModalContent: React.FC<TranscriptModalContentProps> = ({
                 aria-label="Close transcript"
                 title="Close"
                 autoFocus
+                className="modal-close"
               >
                 <XMarkIcon />
               </button>
             </header>
 
-            <div className="transcription-transcript-modal-body">
+            <div className="transcription-transcript-modal-body modal-panel-scroll">
               <dl className="transcription-transcript-summary">
                 <div>
                   <dt>File ID</dt>
@@ -404,7 +405,7 @@ const TranscriptModalContent: React.FC<TranscriptModalContentProps> = ({
               </section>
             </div>
 
-            <footer className="transcription-transcript-modal-footer">
+            <footer className="transcription-transcript-modal-footer modal-panel-foot">
               {copyState === "failed" && (
                 <span>Could not copy the transcript.</span>
               )}

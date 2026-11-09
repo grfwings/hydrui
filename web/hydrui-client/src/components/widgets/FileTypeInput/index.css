@@ -56,3 +56,13 @@
 .file-type-suggestion-item.selected {
   background-color: var(--color-blue-600);
 }
+
+@media (pointer: coarse) {
+  .file-type-input-field {
+    font-size: 1rem;
+  }
+
+  .file-type-suggestion-item {
+    min-height: var(--touch-target, 44px);
+  }
+}

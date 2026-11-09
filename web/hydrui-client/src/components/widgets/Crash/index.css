@@ -138,3 +138,21 @@
 .crash-retry-button:active {
   background-color: var(--color-blue-700);
 }
+
+@media (max-width: 640px) {
+  .crash-container {
+    padding: 1rem max(1rem, var(--safe-right, 0px)) 1rem
+      max(1rem, var(--safe-left, 0px));
+  }
+
+  .crash-content {
+    max-width: none;
+    width: 100%;
+  }
+}
+
+@media (pointer: coarse) {
+  .crash-retry-button {
+    min-height: var(--touch-target, 44px);
+  }
+}

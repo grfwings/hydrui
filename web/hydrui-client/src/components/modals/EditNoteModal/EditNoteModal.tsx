@@ -1,8 +1,10 @@
+import { XMarkIcon } from "@heroicons/react/24/solid";
 import { FocusTrap } from "focus-trap-react";
 import React, { useCallback, useRef, useState } from "react";
 
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import PushButton from "@/components/widgets/PushButton/PushButton";
+import { useIsCoarsePointer } from "@/hooks/useMediaQuery";
 import { useShortcut } from "@/hooks/useShortcut";
 
 import "./index.css";
@@ -24,6 +26,7 @@ const EditNoteModal: React.FC<EditNoteProps> = ({
 }) => {
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isCoarsePointer = useIsCoarsePointer();
 
   const saveNote = useCallback(() => {
     if (!textareaRef.current) {
@@ -47,23 +50,32 @@ const EditNoteModal: React.FC<EditNoteProps> = ({
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="edit-note-modal-container">
-        <div className="edit-note-modal-wrapper">
+        <div className="edit-note-modal-wrapper modal-shell modal-sheet">
           <div className="edit-note-modal-backdrop" onClick={handleClose} />
-          <div className="edit-note-modal-content">
+          <div className="edit-note-modal-content modal-panel">
             {/* Header */}
-            <div className="edit-note-modal-header">
+            <div className="edit-note-modal-header modal-panel-head">
               <h3 className="edit-note-modal-title">Edit Note ({name})</h3>
+              <button
+                onClick={handleClose}
+                className="modal-close modal-close-compact"
+                aria-label="Close"
+              >
+                <XMarkIcon />
+              </button>
             </div>
             {/* Content */}
-            <div className="edit-note-modal-body">
+            <div className="edit-note-modal-body modal-panel-scroll">
               <textarea
                 defaultValue={text}
                 ref={textareaRef}
-                autoFocus={true}
+                autoFocus={!isCoarsePointer}
+                autoComplete="off"
+                spellCheck={false}
               />
             </div>
             {/* Footer */}
-            <div className="edit-note-modal-footer">
+            <div className="edit-note-modal-footer modal-panel-foot">
               <PushButton onClick={handleClose} variant="secondary">
                 Cancel
               </PushButton>

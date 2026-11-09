@@ -1,3 +1,4 @@
+import { XMarkIcon } from "@heroicons/react/24/solid";
 import { FocusTrap } from "focus-trap-react";
 import React, { useCallback, useRef, useState } from "react";
 
@@ -56,19 +57,26 @@ const AddTagModelModal: React.FC<AddTagModelModalProps> = ({ onClose }) => {
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="add-tag-model-modal-container">
-        <div className="add-tag-model-modal-wrapper">
+        <div className="add-tag-model-modal-wrapper modal-shell modal-sheet">
           <div className="add-tag-model-modal-backdrop" onClick={onClose} />
 
-          <div className="add-tag-model-modal-content">
+          <div className="add-tag-model-modal-content modal-panel">
             {/* Header */}
-            <div className="add-tag-model-modal-header">
+            <div className="add-tag-model-modal-header modal-panel-head">
               <h3 className="add-tag-model-modal-title">
                 Install Model from URL
               </h3>
+              <button
+                onClick={onClose}
+                className="modal-close modal-close-compact"
+                aria-label="Close"
+              >
+                <XMarkIcon />
+              </button>
             </div>
 
             {/* Content */}
-            <div className="add-tag-model-modal-body">
+            <div className="add-tag-model-modal-body modal-panel-scroll">
               <div className="add-tag-model-modal-url-input-container">
                 <input
                   ref={inputRef}
@@ -77,12 +85,17 @@ const AddTagModelModal: React.FC<AddTagModelModalProps> = ({ onClose }) => {
                   className="add-tag-model-modal-url-input"
                   disabled={isLoading}
                   onKeyDown={handleInputKeyDown}
+                  inputMode="url"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  enterKeyHint="go"
                 />
               </div>
             </div>
 
             {/* Footer */}
-            <div className="add-tag-model-modal-footer">
+            <div className="add-tag-model-modal-footer modal-panel-foot">
               <PushButton
                 onClick={onClose}
                 variant="secondary"

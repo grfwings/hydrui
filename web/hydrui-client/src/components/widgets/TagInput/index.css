@@ -29,10 +29,17 @@
 
 .tag-suggestions {
   position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
   margin-top: 0.25rem;
   width: 100%;
+  max-width: 100%;
   max-height: 15rem;
+  max-height: min(15rem, 50dvh);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background-color: var(--color-gray-700);
   border-radius: var(--radius-sm);
   z-index: 10;
@@ -60,4 +67,25 @@
 .tag-suggestion-count {
   color: var(--color-gray-400);
   font-size: var(--text-sm);
+}
+
+/* Keep the field from triggering iOS focus zoom and make suggestion rows
+   comfortable to tap. */
+@media (pointer: coarse) {
+  .tag-input-field {
+    font-size: 1rem;
+    min-height: var(--touch-target, 44px);
+  }
+
+  .tag-suggestion-item {
+    min-height: var(--touch-target, 44px);
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .tag-suggestions {
+    max-height: min(18rem, 50dvh);
+  }
 }

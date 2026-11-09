@@ -127,6 +127,11 @@ const FileTypeInput: React.FC<FileTypeInputProps> = ({
           placeholder="Enter filetypes..."
           className="file-type-input-field"
           disabled={disabled}
+          autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="done"
         />
 
         {/* Suggestions dropdown */}

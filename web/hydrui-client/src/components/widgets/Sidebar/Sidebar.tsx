@@ -9,7 +9,7 @@ import "./index.css";
 const TAGS_MIN = 100;
 const PREVIEW_MIN = 100;
 
-function Sidebar() {
+function Sidebar({ stacked = false }: { stacked?: boolean }) {
   const { setTagListHidden, setPreviewHidden, setTagListHeightPercent } =
     useUIStateActions();
   const [tagsHeight, setTagsHeight] = useState({
@@ -19,9 +19,13 @@ function Sidebar() {
     pixels: 0,
     lastY: -1,
   });
-  setTagListHidden(tagsHeight.tagsHidden);
-  setPreviewHidden(tagsHeight.previewHidden);
-  setTagListHeightPercent(tagsHeight.percent);
+  // The stacked variant is used inside the phone bottom sheet, where the split
+  // is not draggable. Do not write back to the persisted desktop layout there.
+  if (!stacked) {
+    setTagListHidden(tagsHeight.tagsHidden);
+    setPreviewHidden(tagsHeight.previewHidden);
+    setTagListHeightPercent(tagsHeight.percent);
+  }
   const mainRef = useRef<HTMLDivElement>(null);
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
@@ -108,6 +112,9 @@ function Sidebar() {
   }, []);
 
   useLayoutEffect(() => {
+    if (stacked) {
+      return;
+    }
     const adjustTagsHeight = () => {
       setTagsHeight((current) => {
         if (!mainRef.current) {
@@ -140,7 +147,18 @@ function Sidebar() {
         window.removeEventListener("resize", adjustTagsHeight);
       }
     };
-  }, []);
+  }, [stacked]);
+
+  if (stacked) {
+    return (
+      <div className="sidebar-container sidebar-container-stacked">
+        <div className="sidebar-stacked-tags">
+          <TagList />
+        </div>
+        <FilePreview />
+      </div>
+    );
+  }
 
   return (
     <div className="sidebar-container" ref={mainRef}>

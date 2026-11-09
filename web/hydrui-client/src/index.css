@@ -279,6 +279,16 @@ button {
   --animate-spin: spin 1s linear infinite;
   --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 
+  /* Touch and safe-area foundations (see web/hydrui-client mobile brief) */
+  --touch-target: 44px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  /* Height of the phone bottom bar, including its safe-area padding. 0 on
+     desktop, so fixed overlays anchored to it stay flush with the screen. */
+  --compact-bottom-bar-height: 0px;
+
   --blur-xs: 4px;
   --blur-sm: 8px;
 
@@ -293,6 +303,9 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
   font-family:
     ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
     "Segoe UI Symbol", "Noto Color Emoji";
@@ -301,6 +314,45 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  max-width: 100%;
+}
+
+/* Keep a visible focus indicator for keyboard users. Components may opt into
+   a tighter style, but the global default never leaves focus invisible. */
+:focus-visible {
+  outline: 2px solid var(--color-blue-400);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --compact-bottom-bar-height: calc(58px + var(--safe-bottom));
+  }
+}
+
+@media (pointer: coarse) {
+  /* Controls should react on the first tap, without a 300ms double-tap wait. */
+  button,
+  [role="button"],
+  a[href],
+  input,
+  select,
+  textarea,
+  summary {
+    touch-action: manipulation;
+  }
+
+  /* iOS zooms the page when a focused field has font-size < 16px. */
+  input,
+  select,
+  textarea {
+    font-size: 1rem;
+  }
 }
 
 .hidden {

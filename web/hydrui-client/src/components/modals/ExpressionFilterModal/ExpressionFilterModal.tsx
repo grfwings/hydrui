@@ -1,4 +1,4 @@
-import { InformationCircleIcon } from "@heroicons/react/24/solid";
+import { InformationCircleIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { FocusTrap } from "focus-trap-react";
 import React, { useCallback, useRef, useState } from "react";
 
@@ -82,17 +82,24 @@ const ExpressionFilterModal: React.FC<ExpressionFilterModalProps> = ({
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="expr-filter-modal-container">
-        <div className="expr-filter-modal-wrapper">
+        <div className="expr-filter-modal-wrapper modal-shell modal-sheet">
           <div className="expr-filter-modal-backdrop" onClick={onClose} />
 
-          <div className="expr-filter-modal-content">
+          <div className="expr-filter-modal-content modal-panel">
             {/* Header */}
-            <div className="expr-filter-modal-header">
+            <div className="expr-filter-modal-header modal-panel-head">
               <h3 className="expr-filter-modal-title">Expression Filter</h3>
+              <button
+                onClick={onClose}
+                className="modal-close modal-close-compact"
+                aria-label="Close"
+              >
+                <XMarkIcon />
+              </button>
             </div>
 
             {/* Content */}
-            <div className="expr-filter-modal-body">
+            <div className="expr-filter-modal-body modal-panel-scroll">
               <ExprInput
                 onEnter={execute}
                 getPlaceholders={getPlaceholders}
@@ -124,7 +131,7 @@ const ExpressionFilterModal: React.FC<ExpressionFilterModalProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="expr-filter-modal-footer">
+            <div className="expr-filter-modal-footer modal-panel-foot">
               <a
                 className="push-button primary"
                 style={{

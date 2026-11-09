@@ -1,3 +1,4 @@
+import { XMarkIcon } from "@heroicons/react/24/solid";
 import { FocusTrap } from "focus-trap-react";
 import React from "react";
 
@@ -26,19 +27,26 @@ const TokenPassingModal: React.FC<TokenPassingModalProps> = ({ onClose }) => {
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="token-passing-modal-container">
-        <div className="token-passing-modal-wrapper">
+        <div className="token-passing-modal-wrapper modal-shell modal-sheet">
           <div className="token-passing-modal-backdrop" onClick={onClose} />
 
-          <div className="token-passing-modal-content">
+          <div className="token-passing-modal-content modal-panel">
             {/* Header */}
-            <div className="token-passing-modal-header">
+            <div className="token-passing-modal-header modal-panel-head">
               <h3 className="token-passing-modal-title">
                 Token Passing Required
               </h3>
+              <button
+                onClick={onClose}
+                className="modal-close modal-close-compact"
+                aria-label="Close"
+              >
+                <XMarkIcon />
+              </button>
             </div>
 
             {/* Content */}
-            <div className="token-passing-modal-body">
+            <div className="token-passing-modal-body modal-panel-scroll">
               <p className="token-passing-modal-message">
                 This action requires passing your hydrus network token to an
                 external web application. While it is unlikely to be a problem,
@@ -58,7 +66,7 @@ const TokenPassingModal: React.FC<TokenPassingModalProps> = ({ onClose }) => {
             </div>
 
             {/* Footer */}
-            <div className="token-passing-modal-footer">
+            <div className="token-passing-modal-footer modal-panel-foot">
               <PushButton onClick={onClose} variant="secondary">
                 Cancel
               </PushButton>

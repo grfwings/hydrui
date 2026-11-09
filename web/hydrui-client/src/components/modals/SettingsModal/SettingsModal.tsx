@@ -71,18 +71,18 @@ function SettingsModal({ onClose }: SettingsModalProps) {
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="settings-modal-container">
-        <div className="settings-modal-wrapper">
+        <div className="settings-modal-wrapper modal-shell modal-full">
           {/* Backdrop */}
           <div className="settings-modal-backdrop" onClick={onClose} />
 
           {/* Modal */}
-          <div className="settings-modal-content">
+          <div className="settings-modal-content modal-panel">
             {/* Header */}
-            <div className="settings-modal-header">
+            <div className="settings-modal-header modal-panel-head">
               <h2 className="settings-modal-title">Settings</h2>
               <button
                 onClick={onClose}
-                className="settings-modal-close-button"
+                className="settings-modal-close-button modal-close"
                 aria-label="Close"
               >
                 <XMarkIcon className="settings-modal-close-icon" />
@@ -90,7 +90,7 @@ function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
 
             {/* Tabs */}
-            <div className="settings-modal-tabs">
+            <div className="settings-modal-tabs modal-panel-tabs">
               <div className="settings-modal-tabs-list">
                 <button
                   onClick={() => setActiveTab("general")}
@@ -136,7 +136,7 @@ function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
 
             {/* Content */}
-            <div className="settings-modal-content-area">
+            <div className="settings-modal-content-area modal-panel-scroll">
               {activeTab === "general" && (
                 <>
                   <fieldset>
@@ -209,7 +209,7 @@ function SettingsModal({ onClose }: SettingsModalProps) {
                 </>
               )}
             </div>
-            <div className="settings-modal-buttons">
+            <div className="settings-modal-buttons modal-panel-foot">
               <PushButton onClick={onClose} variant="secondary">
                 Close
               </PushButton>
@@ -704,6 +704,10 @@ const TagColorsEditor: React.FC<{
           className="settings-modal-namespace-input"
           placeholder="Namespace to add..."
           onKeyDown={handleInputKeyDown}
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          enterKeyHint="done"
         />
       </div>
       <legend>Tag Namespace Colors</legend>
@@ -1185,6 +1189,8 @@ function LanguageModelProviderSettings() {
                     onChange={(e) =>
                       updateProvider(p.id, { name: e.target.value })
                     }
+                    autoComplete="off"
+                    spellCheck={false}
                   />
                 </div>
                 <div className="settings-row">
@@ -1195,6 +1201,10 @@ function LanguageModelProviderSettings() {
                     onChange={(e) =>
                       updateProvider(p.id, { baseUrl: e.target.value })
                     }
+                    inputMode="url"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
                   />
                 </div>
                 <div className="settings-row">
@@ -1205,6 +1215,9 @@ function LanguageModelProviderSettings() {
                     onChange={(e) =>
                       updateProvider(p.id, { apiKey: e.target.value })
                     }
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
                   />
                 </div>
                 <div className="settings-row">

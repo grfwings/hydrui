@@ -2,6 +2,8 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background-color: var(--color-gray-800);
   color: var(--color-white);
 }
@@ -9,6 +11,7 @@
 .main-screen-content {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -29,10 +32,80 @@
 
 .main-screen-tab-view {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
 }
 
 .main-screen-status-bar {
   padding: 0.5rem;
   border-top: 1px solid var(--color-gray-700);
+}
+
+/* The compact bottom bar abuts the page content and already pads for the
+   device safe area, so page-level floating controls must not add it again. */
+.main-screen-compact .main-screen-content {
+  --page-safe-bottom: 0px;
+}
+
+/* Phone bottom bar: replaces the desktop status bar and holds the on-demand
+   tags entry point plus a condensed status summary. */
+.main-screen-compact-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: var(--compact-bottom-bar-height);
+  min-height: var(--compact-bottom-bar-height);
+  padding: 6px max(8px, var(--safe-right)) var(--safe-bottom)
+    max(8px, var(--safe-left));
+  border-top: 1px solid var(--color-gray-700);
+  background-color: var(--color-gray-800);
+}
+
+.main-screen-compact-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.main-screen-compact-status .status-bar {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.main-screen-compact-status .status-bar-section {
+  margin-right: 0;
+  min-width: 0;
+}
+
+.main-screen-compact-status .status-bar-info {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.main-screen-tags-button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-width: var(--touch-target, 44px);
+  min-height: var(--touch-target, 44px);
+  padding: 0 0.875rem;
+  border-radius: var(--radius-md);
+  background-color: var(--color-gray-700);
+  color: var(--color-gray-100);
+  font-size: var(--text-sm);
+}
+
+.main-screen-tags-button:hover,
+.main-screen-tags-button.is-open {
+  background-color: var(--color-gray-600);
+}
+
+.main-screen-tags-icon {
+  height: 1.25rem;
+  width: 1.25rem;
 }

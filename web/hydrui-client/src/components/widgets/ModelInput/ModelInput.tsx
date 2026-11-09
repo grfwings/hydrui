@@ -145,6 +145,11 @@ const ModelInput: React.FC<ModelInputProps> = ({
         placeholder="Model name..."
         className="model-input-field"
         disabled={disabled}
+        autoComplete="off"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        enterKeyHint="done"
       />
 
       {showSuggestions && (loading || filtered.length > 0) && (

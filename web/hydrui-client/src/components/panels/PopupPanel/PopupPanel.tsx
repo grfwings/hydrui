@@ -8,6 +8,7 @@ import {
 import React, { useEffect } from "react";
 
 import { JobStatus } from "@/api/types";
+import { useIsCompactLayout } from "@/hooks/useMediaQuery";
 import { client } from "@/store/apiStore";
 import { usePageActions, usePageStore } from "@/store/pageStore";
 import { usePopupStore } from "@/store/popupStore";
@@ -41,6 +42,7 @@ const PopupPanel: React.FC = () => {
 
   const { addVirtualPage, updateVirtualPage, setPage } = usePageActions();
   const virtualPages = usePageStore((state) => state.virtualPages);
+  const isCompact = useIsCompactLayout();
 
   // Initial fetch and polling setup
   useEffect(() => {
@@ -93,19 +95,31 @@ const PopupPanel: React.FC = () => {
       <button
         onClick={handleExpand}
         className={`popup-collapsed-button ${
+          isCompact ? "popup-collapsed-button-compact" : ""
+        } ${
           error
             ? "popup-collapsed-button-error"
             : hasUnread
               ? "popup-collapsed-button-unread"
               : "popup-collapsed-button-normal"
         }`}
+        aria-label={
+          error
+            ? "Show messages: connection error"
+            : hasUnread
+              ? "Show messages: unread updates"
+              : "Show messages"
+        }
+        title={error ? "Connection Error" : "Show Messages"}
       >
         {error ? (
           <ExclamationCircleIcon className="popup-collapsed-icon" />
         ) : (
           <ChevronUpIcon className="popup-collapsed-icon" />
         )}
-        <span>{error ? "Connection Error" : "Show Messages"}</span>
+        {!isCompact && (
+          <span>{error ? "Connection Error" : "Show Messages"}</span>
+        )}
         {hasUnread && !error && (
           <span className="popup-notification-indicator" />
         )}

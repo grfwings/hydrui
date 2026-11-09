@@ -75,6 +75,7 @@ const SystemPromptInput: React.FC<SystemPromptInputProps> = ({
         rows={rows}
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
+        autoComplete="off"
       />
     </div>
   );

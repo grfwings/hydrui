@@ -1,3 +1,4 @@
+import { XMarkIcon } from "@heroicons/react/24/solid";
 import { FocusTrap } from "focus-trap-react";
 import React, { useCallback, useState } from "react";
 
@@ -65,21 +66,28 @@ const EditColorModal: React.FC<EditColorProps> = ({ namespace, onClose }) => {
   return (
     <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
       <div className="edit-color-modal-container">
-        <div className="edit-color-modal-wrapper">
+        <div className="edit-color-modal-wrapper modal-shell modal-sheet">
           <div className="edit-color-modal-backdrop" onClick={onClose} />
-          <div className="edit-color-modal-content">
+          <div className="edit-color-modal-content modal-panel">
             {/* Header */}
-            <div className="edit-color-modal-header">
+            <div className="edit-color-modal-header modal-panel-head">
               <h3 className="edit-color-modal-title">
                 Edit Color ({colorName})
               </h3>
+              <button
+                onClick={onClose}
+                className="modal-close modal-close-compact"
+                aria-label="Close"
+              >
+                <XMarkIcon />
+              </button>
             </div>
             {/* Content */}
-            <div className="edit-color-modal-body">
+            <div className="edit-color-modal-body modal-panel-scroll">
               <ColorEditor color={color} setColor={setColor}></ColorEditor>
             </div>
             {/* Footer */}
-            <div className="edit-color-modal-footer">
+            <div className="edit-color-modal-footer modal-panel-foot">
               <PushButton onClick={onClose} variant="secondary">
                 Cancel
               </PushButton>

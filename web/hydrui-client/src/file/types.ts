@@ -11,6 +11,9 @@ export interface ViewerProps {
 
   onAnnotationDirtyChange?: ((dirty: boolean) => void) | undefined;
 
+  // Reports zoom state for viewers that support pan/zoom.
+  onZoomChange?: ((zoomed: boolean) => void) | undefined;
+
   navigateLeft?: (() => void) | undefined;
   navigateRight?: (() => void) | undefined;
 }

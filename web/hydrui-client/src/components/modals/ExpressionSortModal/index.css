@@ -1,3 +1,5 @@
+@import "../modal-shared.css";
+
 .expr-sort-modal-container {
   position: fixed;
   inset: 0;
@@ -10,6 +12,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 1rem;
 }
 
@@ -60,6 +63,12 @@
   border-radius: var(--radius-sm);
   padding: 0.25rem;
   font-size: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .expr-sort-modal-help code {
+    overflow-wrap: anywhere;
+  }
 }
 
 .expr-sort-modal-footer {

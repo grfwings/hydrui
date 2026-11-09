@@ -136,3 +136,40 @@
 .incdec-rating-value.loading {
   opacity: 0.5;
 }
+
+/* Touch: every rating control (and each star) is a full 44px target with the
+   icon drawn at its normal visual size. */
+@media (pointer: coarse) {
+  .rating-button {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .rating-button .rating-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .star-rating-star {
+    width: var(--touch-target, 44px);
+    padding-right: 0;
+  }
+
+  .incdec-rating-container {
+    gap: 0.25rem;
+  }
+
+  .incdec-rating-button-up,
+  .incdec-rating-button-down {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+
+  .incdec-rating-value {
+    min-width: 2rem;
+    text-align: center;
+  }
+}
