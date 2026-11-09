@@ -740,6 +740,12 @@ export const usePageStore = create<PageState>()(
 
           refreshPage: async (pageKey: string, type: PageType) => {
             switch (type) {
+              case "search": {
+                // Re-run the current search. The search store subscription
+                // updates the page when the results change.
+                await useSearchStore.getState().actions.performSearch();
+                return;
+              }
               case "hydrus": {
                 set({
                   isLoadingFiles: true,

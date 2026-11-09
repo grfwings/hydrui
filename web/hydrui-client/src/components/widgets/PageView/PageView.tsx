@@ -52,7 +52,7 @@ import useLongPress from "@/hooks/useLongPress";
 import { useShortcut } from "@/hooks/useShortcut";
 import { client } from "@/store/apiStore";
 import { MenuItem, useContextMenuStore } from "@/store/contextMenuStore";
-import { usePageStore } from "@/store/pageStore";
+import { type PageType, usePageStore } from "@/store/pageStore";
 import { usePreferencesStore } from "@/store/preferencesStore";
 import { useSearchStore } from "@/store/searchStore";
 import { useToastStore } from "@/store/toastStore";
@@ -147,6 +147,10 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
   const [archiveDeleteFilterFiles, setArchiveDeleteFilterFiles] = useState<
     FileMetadata[]
   >([]);
+  const archiveDeleteFilterOriginRef = useRef<{
+    pageKey: string;
+    pageType: PageType;
+  } | null>(null);
   const [tagEditFiles, setTagEditFiles] = useState<FileMetadata[]>([]);
   const [urlEditFiles, setUrlEditFiles] = useState<FileMetadata[]>([]);
   const [batchAutotagFiles, setBatchAutotagFiles] = useState<FileMetadata[]>(
@@ -274,6 +278,7 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
         return;
       }
 
+      archiveDeleteFilterOriginRef.current = { pageKey, pageType };
       setArchiveDeleteFilterFiles(files);
       setShowArchiveDeleteFilter(true);
     } catch (e) {
@@ -282,12 +287,44 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       }
       addToast(`Error preparing Archive/Delete filter: ${e}`, "error");
     }
-  }, [addToast, fileIds, loadedFiles, metadataLoadController, selectedFiles]);
+  }, [
+    addToast,
+    fileIds,
+    loadedFiles,
+    metadataLoadController,
+    pageKey,
+    pageType,
+    selectedFiles,
+  ]);
 
-  const closeArchiveDeleteFilter = useCallback(() => {
-    setShowArchiveDeleteFilter(false);
-    setArchiveDeleteFilterFiles([]);
-  }, []);
+  const closeArchiveDeleteFilter = useCallback(
+    (didSave: boolean) => {
+      setShowArchiveDeleteFilter(false);
+      setArchiveDeleteFilterFiles([]);
+
+      const origin = archiveDeleteFilterOriginRef.current;
+      archiveDeleteFilterOriginRef.current = null;
+      if (!didSave || origin === null) {
+        return;
+      }
+
+      const state = usePageStore.getState();
+      if (
+        state.activePageKey !== origin.pageKey ||
+        state.pageType !== origin.pageType
+      ) {
+        return;
+      }
+
+      void refreshPage(origin.pageKey, origin.pageType).catch((error) => {
+        console.error(
+          "Failed to refresh page after Archive/Delete filter:",
+          error,
+        );
+      });
+    },
+    [refreshPage],
+  );
 
   const selectAllFiles = useCallback(() => {
     const { fileIds } = usePageStore.getState();

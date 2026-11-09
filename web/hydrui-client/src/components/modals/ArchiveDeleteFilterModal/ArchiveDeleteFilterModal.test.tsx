@@ -193,6 +193,21 @@ describe("ArchiveDeleteFilterModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yes" }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledWith(false);
+    expect(apiMocks.deleteFiles).not.toHaveBeenCalled();
+    expect(apiMocks.archiveFiles).not.toHaveBeenCalled();
+    expect(apiMocks.refreshFileMetadata).not.toHaveBeenCalled();
+  });
+
+  it("does not signal a refresh when every file is skipped", async () => {
+    const onClose = vi.fn();
+    render(<ArchiveDeleteFilterModal files={makeFiles(2)} onClose={onClose} />);
+
+    press("ArrowUp");
+    press("ArrowUp");
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledWith(false);
     expect(apiMocks.deleteFiles).not.toHaveBeenCalled();
     expect(apiMocks.archiveFiles).not.toHaveBeenCalled();
     expect(apiMocks.refreshFileMetadata).not.toHaveBeenCalled();
@@ -318,6 +333,7 @@ describe("ArchiveDeleteFilterModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Commit" }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledWith(true);
     expect(apiMocks.deleteFiles).toHaveBeenCalledWith({
       file_ids: [2, 4],
       reason: "Deleted in Archive/Delete filter.",
@@ -329,5 +345,50 @@ describe("ArchiveDeleteFilterModal", () => {
       apiMocks.archiveFiles.mock.invocationCallOrder[0]!,
     );
     expect(apiMocks.refreshFileMetadata).toHaveBeenCalledWith([2, 4, 1, 3]);
+  });
+
+  async function openPartialDeleteFailure(onClose: () => void) {
+    apiMocks.deleteFiles
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("chunk failed"));
+    render(
+      <ArchiveDeleteFilterModal files={makeFiles(101)} onClose={onClose} />,
+    );
+
+    for (let i = 0; i < 101; i++) {
+      press("ArrowLeft");
+    }
+
+    await openCommitDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Commit" }));
+    await screen.findByText(/Deleting failed: chunk failed/);
+  }
+
+  it("keeps the dialog open without signalling a refresh after a partial failure", async () => {
+    const onClose = vi.fn();
+    await openPartialDeleteFailure(onClose);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Leave..." })).toBeEnabled();
+    expect(apiMocks.refreshFileMetadata).toHaveBeenCalledTimes(1);
+    expect(apiMocks.refreshFileMetadata).toHaveBeenCalledWith(
+      Array.from({ length: 100 }, (_, index) => index + 1),
+    );
+  });
+
+  it("signals one refresh when leaving after a partial success", async () => {
+    const onClose = vi.fn();
+    await openPartialDeleteFailure(onClose);
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave..." }));
+    expect(
+      await screen.findByText(
+        "Some changes have already been saved and cannot be undone. Only unsaved decisions will be discarded. Quit filtering now?",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledWith(true);
   });
 });

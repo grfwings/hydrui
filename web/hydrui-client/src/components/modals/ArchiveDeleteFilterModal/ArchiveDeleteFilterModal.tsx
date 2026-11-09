@@ -51,7 +51,7 @@ interface ApplyError {
 
 interface ArchiveDeleteFilterModalProps {
   files: FileMetadata[];
-  onClose: () => void;
+  onClose: (didSave: boolean) => void;
 }
 
 const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
@@ -105,7 +105,7 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
     if (plan.deleteFileIds.length > 0 || plan.archiveFileIds.length > 0) {
       setDialog("commit");
     } else {
-      onClose();
+      onClose(false);
     }
   }, [filter.finished, onClose, plan]);
 
@@ -189,7 +189,7 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
           );
         }
         addToast(`Archive/Delete filter ${results.join(" and ")}.`, "success");
-        onClose();
+        onClose(true);
         return;
       }
 
@@ -384,7 +384,7 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
             }
             confirmLabel="Yes"
             cancelLabel="No"
-            onConfirm={onClose}
+            onConfirm={() => onClose(hasSavedChanges)}
             onCancel={handleCancelForget}
           />
         )}
