@@ -51,6 +51,7 @@ interface PreferencesState {
   fileTypeRendererOverride: Map<HydrusFileType, string>;
   thumbnailSize: number;
   useVirtualViewport: boolean;
+  useWebGPU: boolean;
   allowTokenPassing: boolean;
   eagerLoadThreshold: number;
   startupTabMode: StartupTabMode;
@@ -69,6 +70,7 @@ interface PreferencesState {
     resetAutopreviewFileTypes: () => void;
     setThumbnailSize: (size: number) => void;
     setVirtualViewport: (enabled: boolean) => void;
+    setUseWebGPU: (enabled: boolean) => void;
     setAllowTokenPassing: (enabled: boolean) => void;
     setEagerLoadThreshold: (eagerLoadThreshold: number) => void;
     setStartupTabMode: (mode: StartupTabMode) => void;
@@ -120,6 +122,9 @@ export const usePreferencesStore = create<PreferencesState>()(
 
       // Use virtualized viewport for rendering thumbnails
       useVirtualViewport: true,
+
+      // Use WebGPU for on-device inference when the browser supports it
+      useWebGPU: true,
 
       // Allow passing tokens to external client-side apps
       allowTokenPassing: false,
@@ -248,6 +253,12 @@ export const usePreferencesStore = create<PreferencesState>()(
         setVirtualViewport: (enabled: boolean) => {
           set({
             useVirtualViewport: enabled,
+          });
+        },
+
+        setUseWebGPU: (enabled: boolean) => {
+          set({
+            useWebGPU: enabled,
           });
         },
 
@@ -390,6 +401,7 @@ export const usePreferencesStore = create<PreferencesState>()(
         autopreviewFileTypes: state.autopreviewFileTypes,
         thumbnailSize: state.thumbnailSize,
         useVirtualViewport: state.useVirtualViewport,
+        useWebGPU: state.useWebGPU,
         allowTokenPassing: state.allowTokenPassing,
         eagerLoadThreshold: state.eagerLoadThreshold,
         startupTabMode: state.startupTabMode,

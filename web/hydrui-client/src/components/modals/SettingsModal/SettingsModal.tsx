@@ -796,6 +796,10 @@ function ModelsManager({ setShowAddTagsModelModal }: ModelsManagerProps) {
       resetTagModels,
     },
   } = useModelMetaStore();
+  const {
+    useWebGPU,
+    actions: { setUseWebGPU },
+  } = usePreferencesStore();
   const { addToast, removeToast } = useToastActions();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -907,6 +911,17 @@ function ModelsManager({ setShowAddTagsModelModal }: ModelsManagerProps) {
             </b>
           </p>
         ) : undefined}
+        <div>
+          <label>
+            <input
+              type="checkbox"
+              checked={useWebGPU}
+              onChange={(e) => setUseWebGPU(e.currentTarget.checked)}
+            />{" "}
+            Use GPU (WebGPU) when available
+          </label>
+          <p>Falls back to the CPU when WebGPU is unavailable or fails.</p>
+        </div>
         {usage && usage.usage && usage.quota ? (
           <p>
             You are currently using about{" "}

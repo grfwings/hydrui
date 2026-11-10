@@ -138,6 +138,11 @@
   background-color: var(--color-gray-800);
 }
 
+.batch-autotag-modal-backend {
+  color: var(--color-gray-400);
+  font-size: 0.875rem;
+}
+
 @media (max-width: 640px) {
   .batch-autotag-modal-form-row {
     flex-direction: column;

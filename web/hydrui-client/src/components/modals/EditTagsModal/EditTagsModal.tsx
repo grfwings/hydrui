@@ -13,11 +13,15 @@ import { REAL_TAG_SERVICES } from "@/constants/services";
 import { renderDispatch } from "@/file/renderers";
 import { useShortcut } from "@/hooks/useShortcut";
 import { client } from "@/store/apiStore";
-import { useModelMetaStore } from "@/store/modelMetaStore";
+import {
+  modelUsesCategoryThresholds,
+  useModelMetaStore,
+} from "@/store/modelMetaStore";
 import { usePageActions } from "@/store/pageStore";
 import { useServices } from "@/store/servicesStore";
 import { useToastActions } from "@/store/toastStore";
 import { useUIStateStore } from "@/store/uiStateStore";
+import { type AutotagBackend } from "@/utils/autotag/common";
 import { isServerMode } from "@/utils/modes";
 
 import "./index.css";
@@ -58,6 +62,10 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
   } = useModelMetaStore();
   const { addToast, removeToast } = useToastActions();
   const [activeServiceKey, setActiveServiceKey] = useState<string | null>(null);
+  const [backend, setBackend] = useState<AutotagBackend | null>(null);
+  const selectedModel = autotagModel ? tagModels[autotagModel] : undefined;
+  const usesCategoryThresholds =
+    selectedModel !== undefined && modelUsesCategoryThresholds(selectedModel);
   const [activeTab, setActiveTab] = useState<TabType>("edit");
   const [initialCountsByService, setInitialCountsByService] = useState<
     Record<string, TagMap>
@@ -373,9 +381,13 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
         { ...file },
       );
       const worker = await loadTagModel(autotagModel);
+      setBackend(worker.backend);
       let existing = 0;
       try {
         const result = await worker.processImage(autotagThreshold, bitmap);
+        if (result.backend) {
+          setBackend(result.backend);
+        }
         const existingTags = new Set<string>();
         let hasRating = false;
         if (activeServiceKey && tagCountsByService[activeServiceKey]) {
@@ -642,33 +654,49 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
                       </p>
                     </div>
                   </div>
-                  <div className="edit-tags-modal-autotag-form-row">
-                    <label>Threshold</label>
-                    <div className="edit-tags-modal-autotag-form-control">
-                      <input
-                        className="edit-tags-modal-autotag-number-input"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={autotagThreshold}
-                        onChange={(e) =>
-                          setAutotagThreshold(Number(e.currentTarget.value))
-                        }
-                      />
-                      <input
-                        className="edit-tags-modal-autotag-range-input"
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={autotagThreshold}
-                        onChange={(e) =>
-                          setAutotagThreshold(Number(e.currentTarget.value))
-                        }
-                      />
+                  {backend ? (
+                    <div className="edit-tags-modal-autotag-form-row">
+                      <p className="edit-tags-modal-autotag-backend">
+                        Running on {backend === "webgpu" ? "WebGPU" : "the CPU"}
+                      </p>
                     </div>
-                  </div>
+                  ) : undefined}
+                  {usesCategoryThresholds ? (
+                    <div className="edit-tags-modal-autotag-form-row">
+                      <p>
+                        This model uses its own per-category thresholds; the
+                        threshold slider is not used.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="edit-tags-modal-autotag-form-row">
+                      <label>Threshold</label>
+                      <div className="edit-tags-modal-autotag-form-control">
+                        <input
+                          className="edit-tags-modal-autotag-number-input"
+                          type="number"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={autotagThreshold}
+                          onChange={(e) =>
+                            setAutotagThreshold(Number(e.currentTarget.value))
+                          }
+                        />
+                        <input
+                          className="edit-tags-modal-autotag-range-input"
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={autotagThreshold}
+                          onChange={(e) =>
+                            setAutotagThreshold(Number(e.currentTarget.value))
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="edit-tags-modal-autotag-form-row">
                     <PushButton onClick={processAutotag}>Process</PushButton>
                   </div>

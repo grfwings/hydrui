@@ -4,11 +4,12 @@ import {
   type WorkerResponse,
 } from "@/workers/autotag.worker";
 
-import { type Results } from "./common";
+import { type AutotagBackend, type Results } from "./common";
 import { type Session, loadModel, processImage } from "./inference";
 
 export interface AutotagWorker {
-  loadModel(meta: TagModelMeta): Promise<void>;
+  readonly backend: AutotagBackend | null;
+  loadModel(meta: TagModelMeta, preferWebGPU: boolean): Promise<AutotagBackend>;
   processImage(threshold: number, image: ImageBitmap): Promise<Results>;
   release(): void;
 }
@@ -16,7 +17,11 @@ export interface AutotagWorker {
 class BackgroundAutotagWorker implements AutotagWorker {
   private worker: Worker;
   private serial = 0;
-  private loadPromise?: [() => void, (error: Error) => void];
+  private currentBackend: AutotagBackend | null = null;
+  private loadPromise?: [
+    (backend: AutotagBackend) => void,
+    (error: Error) => void,
+  ];
   private pendingPromises: Map<
     number,
     [(results: Results) => void, (error: Error) => void]
@@ -33,11 +38,18 @@ class BackgroundAutotagWorker implements AutotagWorker {
     worker.addEventListener("message", this.handleWorkerMessage);
   }
 
-  loadModel(meta: TagModelMeta): Promise<void> {
+  get backend(): AutotagBackend | null {
+    return this.currentBackend;
+  }
+
+  loadModel(
+    meta: TagModelMeta,
+    preferWebGPU: boolean,
+  ): Promise<AutotagBackend> {
     return new Promise((resolve, reject) => {
       this.loadPromise = [resolve, reject];
       try {
-        this.postMessage({ type: "loadModel", meta });
+        this.postMessage({ type: "loadModel", meta, preferWebGPU });
       } catch (error) {
         reject(error);
       }
@@ -81,7 +93,8 @@ class BackgroundAutotagWorker implements AutotagWorker {
         if ("error" in response) {
           reject(new Error(response.error));
         } else {
-          resolve();
+          this.currentBackend = response.backend;
+          resolve(response.backend);
         }
         delete this.loadPromise;
         break;
@@ -95,7 +108,8 @@ class BackgroundAutotagWorker implements AutotagWorker {
         if ("error" in response) {
           reject(new Error(response.error));
         } else {
-          resolve(response.results);
+          this.currentBackend = response.backend;
+          resolve({ ...response.results, backend: response.backend });
         }
         this.pendingPromises.delete(response.serial);
         break;
@@ -106,16 +120,39 @@ class BackgroundAutotagWorker implements AutotagWorker {
 
 class MainThreadAutotagWorker implements AutotagWorker {
   private session?: Session;
+  private loadedMeta?: TagModelMeta;
 
-  async loadModel(meta: TagModelMeta): Promise<void> {
-    this.session = await loadModel(meta);
+  get backend(): AutotagBackend | null {
+    return this.session?.backend ?? null;
+  }
+
+  async loadModel(
+    meta: TagModelMeta,
+    preferWebGPU: boolean,
+  ): Promise<AutotagBackend> {
+    this.session = await loadModel(meta, preferWebGPU);
+    this.loadedMeta = meta;
+    return this.session.backend;
   }
 
   async processImage(threshold: number, image: ImageBitmap): Promise<Results> {
-    if (!this.session) {
+    const session = this.session;
+    if (!session) {
       throw new Error("No model loaded!");
     }
-    return processImage(this.session, threshold, image);
+    try {
+      return await processImage(session, threshold, image);
+    } catch (error) {
+      // WebGPU can fail at inference time even when the session was created
+      // successfully. Reload the same model on the CPU once and retry.
+      if (session.backend !== "webgpu" || !this.loadedMeta) {
+        throw error;
+      }
+      const fallbackSession = await loadModel(this.loadedMeta, false);
+      session.modelSession.release();
+      this.session = fallbackSession;
+      return processImage(fallbackSession, threshold, image);
+    }
   }
 
   release(): void {

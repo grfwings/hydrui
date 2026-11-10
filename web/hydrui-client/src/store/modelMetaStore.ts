@@ -13,6 +13,7 @@ import {
   createAutotagWorker,
 } from "@/utils/autotag/worker";
 
+import { usePreferencesStore } from "./preferencesStore";
 import { jsonStorage } from "./storage";
 
 export interface CommonTagModelMeta {
@@ -40,7 +41,27 @@ export interface CamieTaggerModelMeta extends CommonTagModelMeta {
   modelPath?: string;
 }
 
-export type TagModelMeta = WDTaggerModelMeta | CamieTaggerModelMeta;
+export interface HarukaTaggerModelMeta extends CommonTagModelMeta {
+  type: "haruka";
+  // Metadata JSON path in OPFS, if the model is cached
+  metadataPath?: string;
+  // Model path in OPFS, if the metadata is cached
+  modelPath?: string;
+}
+
+export interface PixAITaggerModelMeta extends CommonTagModelMeta {
+  type: "pixai";
+  // Config JSON path in OPFS, if the model is cached
+  configPath?: string;
+  // Model path in OPFS, if the config is cached
+  modelPath?: string;
+}
+
+export type TagModelMeta =
+  | WDTaggerModelMeta
+  | CamieTaggerModelMeta
+  | HarukaTaggerModelMeta
+  | PixAITaggerModelMeta;
 
 interface ModelMeta {
   tagModels: Record<string, TagModelMeta>;
@@ -75,6 +96,21 @@ export function isModelCached(meta: TagModelMeta) {
       return meta.info && meta.tagsPath && meta.modelPath;
     case "camie":
       return meta.metadataPath && meta.modelPath;
+    case "haruka":
+      return meta.metadataPath && meta.modelPath;
+    case "pixai":
+      return meta.configPath && meta.modelPath;
+  }
+}
+
+export function modelUsesCategoryThresholds(meta: TagModelMeta): boolean {
+  switch (meta.type) {
+    case "wd":
+    case "camie":
+      return false;
+    case "haruka":
+    case "pixai":
+      return true;
   }
 }
 
@@ -104,7 +140,12 @@ export const useModelMetaStore = create<ModelMeta>()(
           await deleteSavedFiles(model);
           delete model.modelPath;
           if (model.type === "wd") delete model.tagsPath;
-          if (model.type === "camie") delete model.metadataPath;
+          if (model.type === "camie" || model.type === "haruka") {
+            delete model.metadataPath;
+          }
+          if (model.type === "pixai") {
+            delete model.configPath;
+          }
           set((state) => ({
             ...state,
             tagModels: {
@@ -174,7 +215,10 @@ export const useModelMetaStore = create<ModelMeta>()(
             model = await get().actions.downloadTagModel(name);
           }
           const worker = await createAutotagWorker();
-          await worker.loadModel(model);
+          await worker.loadModel(
+            model,
+            usePreferencesStore.getState().useWebGPU,
+          );
           return worker;
         },
       },

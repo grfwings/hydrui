@@ -1,5 +1,5 @@
 import { type TagModelMeta } from "@/store/modelMetaStore";
-import { type Results } from "@/utils/autotag/common";
+import { type AutotagBackend, type Results } from "@/utils/autotag/common";
 import {
   type Session,
   loadModel,
@@ -9,6 +9,7 @@ import {
 type LoadModelRequest = {
   type: "loadModel";
   meta: TagModelMeta;
+  preferWebGPU: boolean;
 };
 
 type ProcessImageRequest = {
@@ -28,6 +29,7 @@ type LoadModelResponse =
   | {
       type: "loadModel";
       success: true;
+      backend: AutotagBackend;
     };
 
 type ProcessImageResponse =
@@ -40,6 +42,7 @@ type ProcessImageResponse =
       type: "processImage";
       results: Results;
       serial: number;
+      backend: AutotagBackend;
     };
 
 export type WorkerResponse = LoadModelResponse | ProcessImageResponse;
@@ -50,6 +53,7 @@ function postMessage(response: WorkerResponse) {
 
 // State within the worker
 let session: Session | null = null;
+let loadedMeta: TagModelMeta | null = null;
 
 // Message handler
 self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
@@ -57,10 +61,12 @@ self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
   switch (data.type) {
     case "loadModel":
       try {
-        session = await loadModel(data.meta);
+        session = await loadModel(data.meta, data.preferWebGPU);
+        loadedMeta = data.meta;
         postMessage({
           type: "loadModel",
           success: true,
+          backend: session.backend,
         });
       } catch (error) {
         postMessage({
@@ -72,14 +78,41 @@ self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
 
     case "processImage":
       try {
-        if (!session) {
+        const currentSession = session;
+        if (!currentSession) {
           throw new Error("No model loaded!");
         }
-        const results = await processImage(session, data.threshold, data.image);
+        let results: Results;
+        let backend: AutotagBackend;
+        try {
+          results = await processImage(
+            currentSession,
+            data.threshold,
+            data.image,
+          );
+          backend = results.backend ?? currentSession.backend;
+        } catch (error) {
+          // WebGPU can fail at inference time even when the session was
+          // created successfully. Reload the same model on the CPU once and
+          // retry this image.
+          if (currentSession.backend !== "webgpu" || !loadedMeta) {
+            throw error;
+          }
+          const fallbackSession = await loadModel(loadedMeta, false);
+          currentSession.modelSession.release();
+          session = fallbackSession;
+          results = await processImage(
+            fallbackSession,
+            data.threshold,
+            data.image,
+          );
+          backend = results.backend ?? fallbackSession.backend;
+        }
         postMessage({
           type: "processImage",
           results,
           serial: data.serial,
+          backend,
         });
       } catch (error) {
         postMessage({
