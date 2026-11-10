@@ -4,6 +4,7 @@ import { SortFilesBy } from "@/constants/sort";
 
 import { client } from "./apiStore";
 import { SEARCH_PAGE_KEY, usePageStore } from "./pageStore";
+import { usePreferencesStore } from "./preferencesStore";
 import { useSearchStore } from "./searchStore";
 
 function metadataResponse(fileIds: number[]) {
@@ -35,6 +36,7 @@ function resetPageStore() {
     pageType: "search",
     virtualPages: {},
     virtualPageKeys: [],
+    eagerLoadPageKeys: [],
   });
 }
 
@@ -186,5 +188,111 @@ describe("pageStore refreshPage", () => {
     expect(usePageStore.getState().virtualPages["virtual-1"]?.fileIds).toEqual([
       7, 8,
     ]);
+  });
+});
+
+describe("pageStore eager metadata loading", () => {
+  const FILE_COUNT = 1000;
+  const THRESHOLD = 512;
+
+  beforeEach(() => {
+    resetPageStore();
+    usePreferencesStore.setState({ eagerLoadThreshold: THRESHOLD });
+    useSearchStore.setState({
+      searchTags: ["inbox"],
+      searchResults: Array.from(
+        { length: FILE_COUNT },
+        (_, index) => index + 1,
+      ),
+      searchStatus: "loaded",
+      autoSearch: false,
+      cancelSearch: null,
+      serial: 0,
+    });
+    vi.spyOn(client, "getFileMetadata").mockImplementation(async (fileIds) =>
+      metadataResponse(fileIds),
+    );
+  });
+
+  afterEach(() => {
+    usePageStore.getState().actions.cancelCurrentPageLoad();
+    vi.restoreAllMocks();
+  });
+
+  function startLoading() {
+    usePageStore.setState({
+      activePageKey: SEARCH_PAGE_KEY,
+      pageType: "search",
+    });
+    void usePageStore
+      .getState()
+      .actions.updatePageContents(SEARCH_PAGE_KEY, "search");
+  }
+
+  it("loads up to the threshold, then pauses the rest", async () => {
+    startLoading();
+
+    await vi.waitFor(() =>
+      expect(usePageStore.getState().isLoadingPaused).toBe(true),
+    );
+    expect(usePageStore.getState().loadedFileCount).toBe(THRESHOLD);
+
+    // Nothing more is fetched until the page is resumed.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(usePageStore.getState().loadedFileCount).toBe(THRESHOLD);
+  });
+
+  it("loads the rest and remembers the page when resumed", async () => {
+    startLoading();
+    await vi.waitFor(() =>
+      expect(usePageStore.getState().isLoadingPaused).toBe(true),
+    );
+
+    usePageStore.getState().actions.setIsLoadingPaused(false);
+
+    await vi.waitFor(() =>
+      expect(usePageStore.getState().loadedFileCount).toBe(FILE_COUNT),
+    );
+    expect(usePageStore.getState().isLoadingPaused).toBe(false);
+    expect(usePageStore.getState().eagerLoadPageKeys).toEqual([
+      SEARCH_PAGE_KEY,
+    ]);
+  });
+
+  it("does not pause a remembered page on the next load", async () => {
+    usePageStore.setState({ eagerLoadPageKeys: [SEARCH_PAGE_KEY] });
+    startLoading();
+
+    await vi.waitFor(() =>
+      expect(usePageStore.getState().loadedFileCount).toBe(FILE_COUNT),
+    );
+    expect(usePageStore.getState().isLoadingPaused).toBe(false);
+  });
+
+  it("forgets the page when loading is paused again", () => {
+    usePageStore.setState({
+      activePageKey: SEARCH_PAGE_KEY,
+      eagerLoadPageKeys: [SEARCH_PAGE_KEY],
+    });
+
+    usePageStore.getState().actions.setIsLoadingPaused(true);
+
+    expect(usePageStore.getState().eagerLoadPageKeys).toEqual([]);
+  });
+
+  it("cancels a paused load without resuming or remembering it", async () => {
+    startLoading();
+    await vi.waitFor(() =>
+      expect(usePageStore.getState().isLoadingPaused).toBe(true),
+    );
+    const fetches = vi.mocked(client.getFileMetadata).mock.calls.length;
+
+    usePageStore.getState().actions.cancelCurrentPageLoad();
+
+    expect(usePageStore.getState().isLoadingFiles).toBe(false);
+    expect(usePageStore.getState().isLoadingPaused).toBe(false);
+    expect(usePageStore.getState().eagerLoadPageKeys).toEqual([]);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(vi.mocked(client.getFileMetadata).mock.calls.length).toBe(fetches);
   });
 });

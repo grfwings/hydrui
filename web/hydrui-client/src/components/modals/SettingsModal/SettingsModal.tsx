@@ -504,9 +504,9 @@ function PageViewSettings() {
         </div>
         <div>
           <p>
-            When there are greater than {eagerLoadThreshold} files on a page,
-            Hydrui will only load metadata as-needed rather than loading all of
-            it.
+            Hydrui eagerly loads metadata for up to {eagerLoadThreshold} files
+            on a page, then pauses and loads the rest on demand. Resuming a page
+            loads all of it, and Hydrui remembers that for next time.
           </p>
         </div>
       </fieldset>

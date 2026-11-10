@@ -20,6 +20,10 @@ export { SEARCH_PAGE_KEY } from "./pageUtils";
 
 export type PageType = "search" | "hydrus" | "virtual";
 
+// How many resumed pages are remembered for eager loading. Old entries fall off
+// so the persisted list cannot grow without bound.
+const EAGER_LOAD_PAGE_LIMIT = 50;
+
 // Interface for virtual pages
 export interface VirtualPage {
   name: string;
@@ -66,6 +70,10 @@ interface PageState extends PersistedState {
   currentAbortController: AbortController | null;
   metadataLoadController: MetadataLoadController | null;
   startupInitialized: boolean;
+  // Pages whose owner asked for their full metadata at least once. Persisted so
+  // a reload (mobile browsers discard background tabs) does not pause them
+  // again behind the eager-load threshold.
+  eagerLoadPageKeys: string[];
   // Actions
   actions: {
     initializeStartup: () => Promise<void>;
@@ -375,8 +383,7 @@ export const usePageStore = create<PageState>()(
           fileIds,
           fileIdToIndex,
           isLoadingFiles: true,
-          isLoadingPaused:
-            fileIds.length > usePreferencesStore.getState().eagerLoadThreshold,
+          isLoadingPaused: false,
           isLoadingAwake: true,
           loadedFiles: [],
           loadedFileCount,
@@ -406,6 +413,14 @@ export const usePageStore = create<PageState>()(
             chunk;
             chunk = fileIdChunks.shift()
           ) {
+            // A cancel or page switch may happen while the loader is paused
+            // and waiting for a wakeup.
+            if (
+              get().lastRequestId !== requestId ||
+              get().activePageKey !== pageKey
+            ) {
+              return;
+            }
             const [, resolve] = chunkToPromise.get(chunk) ?? [];
             if (!resolve) {
               throw new Error(
@@ -455,6 +470,16 @@ export const usePageStore = create<PageState>()(
 
             // Yield if paused, if there is no demand set, if there are still chunks left
             if (demandSet.size === 0 && fileIdChunks.length > 0) {
+              // Load up to the eager threshold, then stop until the owner asks
+              // for the rest. Pages whose owner already resumed them load
+              // fully, including after a reload.
+              if (
+                loadedFileCount >=
+                  usePreferencesStore.getState().eagerLoadThreshold &&
+                !get().eagerLoadPageKeys.includes(pageKey)
+              ) {
+                set({ isLoadingPaused: true });
+              }
               await pauseWait(wakeupRef);
             }
           }
@@ -573,6 +598,7 @@ export const usePageStore = create<PageState>()(
         currentAbortController: null,
         metadataLoadController: null,
         startupInitialized: false,
+        eagerLoadPageKeys: [],
 
         actions: {
           initializeStartup: async () => {
@@ -773,10 +799,15 @@ export const usePageStore = create<PageState>()(
           cancelCurrentPageLoad: () => {
             const state = get();
             useSearchStore.getState().cancelSearch?.();
+            // A paused loader is waiting for a wakeup, not a request, so wake
+            // it before dropping the controller. Otherwise it would wait
+            // forever and keep the chunk map alive.
+            state.metadataLoadController?.wakeup();
             if (state.currentAbortController) {
               state.currentAbortController.abort();
             }
             if (!state.isLoadingFiles) {
+              set({ isLoadingPaused: false });
               return;
             }
             const loadedFiles = Object.values(state.loadedFiles);
@@ -788,6 +819,7 @@ export const usePageStore = create<PageState>()(
               fileIds: loadedFiles.map((file) => file.file_id),
               fileIdToIndex,
               isLoadingFiles: false,
+              isLoadingPaused: false,
               isLoadingAwake: false,
               loadedFiles,
               loadedFileCount: loadedFiles.length,
@@ -1285,6 +1317,23 @@ export const usePageStore = create<PageState>()(
           },
 
           setIsLoadingPaused: (isLoadingPaused: boolean) => {
+            const { activePageKey } = get();
+            // Resuming is a per-page request for full metadata, remembered
+            // across reloads. Pausing again withdraws it.
+            if (activePageKey !== null) {
+              set((state) => ({
+                eagerLoadPageKeys: isLoadingPaused
+                  ? state.eagerLoadPageKeys.filter(
+                      (key) => key !== activePageKey,
+                    )
+                  : [
+                      ...state.eagerLoadPageKeys.filter(
+                        (key) => key !== activePageKey,
+                      ),
+                      activePageKey,
+                    ].slice(-EAGER_LOAD_PAGE_LIMIT),
+              }));
+            }
             set({ isLoadingPaused });
             if (!isLoadingPaused) {
               get().metadataLoadController?.wakeup();
@@ -1305,6 +1354,7 @@ export const usePageStore = create<PageState>()(
         pages: state.pages,
         activePageKey: state.activePageKey,
         pageType: state.pageType,
+        eagerLoadPageKeys: state.eagerLoadPageKeys,
       }),
     },
   ),

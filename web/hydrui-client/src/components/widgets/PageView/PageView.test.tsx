@@ -12,10 +12,18 @@ import { useContextMenuStore } from "@/store/contextMenuStore";
 import { usePageStore } from "@/store/pageStore";
 
 import PageView from "./PageView";
+import {
+  TOUCH_DRAG_EDGE_MAX_SPEED,
+  getEdgeScrollSpeed,
+} from "./useTouchDragSelect";
 
 const viewerState = vi.hoisted(() => ({
   calls: 0,
   fileId: null as number | null,
+}));
+
+const filterState = vi.hoisted(() => ({
+  fileIds: [] as number[],
 }));
 
 vi.mock("@/store/pageStore", async () => {
@@ -31,7 +39,12 @@ vi.mock("@/store/pageStore", async () => {
     fileIdToIndex: Map<number, number>;
     selectedFilesByPage: Record<string, number[]>;
     activeFileByPage: Record<string, number | null>;
-    loadedFiles: { file_id: number; hash: string }[];
+    loadedFiles: {
+      file_id: number;
+      hash: string;
+      is_local: boolean;
+      is_trashed: boolean;
+    }[];
     metadataLoadController: null;
     isLoadingFiles: boolean;
     error: null;
@@ -48,6 +61,8 @@ vi.mock("@/store/pageStore", async () => {
     loadedFiles: fileIds.map((fileId) => ({
       file_id: fileId,
       hash: `hash-${fileId}`,
+      is_local: true,
+      is_trashed: false,
     })),
     metadataLoadController: null,
     isLoadingFiles: false,
@@ -156,7 +171,12 @@ vi.mock("@/components/modals/FileViewerModal/FileViewerModal", () => ({
 
 vi.mock(
   "@/components/modals/ArchiveDeleteFilterModal/ArchiveDeleteFilterModal",
-  () => ({ default: () => null }),
+  () => ({
+    default: ({ files }: { files: { file_id: number }[] }) => {
+      filterState.fileIds = files.map((file) => file.file_id);
+      return null;
+    },
+  }),
 );
 vi.mock("@/components/modals/BatchAutoTagModal/BatchAutoTagModal", () => ({
   default: () => null,
@@ -187,6 +207,16 @@ vi.mock("@/components/modals/TokenPassingModal/TokenPassingModal", () => ({
   default: () => null,
 }));
 
+// jsdom has no layout, so `document.elementFromPoint` does not exist. The
+// drag gesture hit-tests through this narrow seam; each test maps pointer
+// coordinates onto the rendered file items.
+const elementFromPointMock = vi.fn<(x: number, y: number) => Element | null>();
+Object.defineProperty(document, "elementFromPoint", {
+  configurable: true,
+  writable: true,
+  value: elementFromPointMock,
+});
+
 function dispatchPointer(
   target: Element,
   type: string,
@@ -210,6 +240,15 @@ function getFileItem(fileId: number) {
   return screen.getByRole("button", { name: `File ${fileId}` });
 }
 
+// File 1 occupies x=100, file 2 x=200, and so on.
+function hitTestFileAt(clientX: number): Element | null {
+  const fileId = Math.round(clientX / 100);
+  if (fileId < 1 || fileId > 6) {
+    return null;
+  }
+  return getFileItem(fileId);
+}
+
 function selection() {
   return usePageStore.getState().selectedFilesByPage["test"] ?? [];
 }
@@ -218,6 +257,9 @@ describe("PageView touch interactions", () => {
   beforeEach(() => {
     viewerState.calls = 0;
     viewerState.fileId = null;
+    filterState.fileIds = [];
+    elementFromPointMock.mockReset();
+    elementFromPointMock.mockImplementation((x) => hitTestFileAt(x));
     usePageStore.setState({
       selectedFilesByPage: {},
       activeFileByPage: {},
@@ -375,5 +417,288 @@ describe("PageView touch interactions", () => {
 
     expect(selection()).toEqual([]);
     expect(screen.queryByRole("toolbar")).toBeNull();
+  });
+
+  it("paints thumbnails passed over after a long press without deselecting", () => {
+    vi.useFakeTimers();
+    render(<PageView pageKey="test" />);
+    const first = getFileItem(1);
+
+    dispatchPointer(first, "pointerdown", {
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 10,
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(selection()).toEqual([1]);
+
+    // Movement below the start threshold must not begin painting.
+    dispatchPointer(first, "pointermove", {
+      pointerType: "touch",
+      clientX: 105,
+      clientY: 10,
+    });
+    expect(selection()).toEqual([1]);
+
+    dispatchPointer(first, "pointermove", {
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 10,
+    });
+    expect(selection()).toEqual([1, 2]);
+    expect(getFileItem(2)).toHaveClass("file-item-touch-selected");
+    expect(
+      within(screen.getByRole("toolbar")).getByText("2 selected"),
+    ).toBeInTheDocument();
+    expect(usePageStore.getState().activeFileByPage["test"]).toBe(2);
+
+    // Dragging back over an already selected file keeps it selected.
+    dispatchPointer(first, "pointermove", {
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 10,
+    });
+    expect(selection()).toEqual([1, 2]);
+    expect(usePageStore.getState().activeFileByPage["test"]).toBe(1);
+
+    dispatchPointer(first, "pointermove", {
+      pointerType: "touch",
+      clientX: 300,
+      clientY: 10,
+    });
+    expect(selection()).toEqual([1, 2, 3]);
+    expect(
+      within(screen.getByRole("toolbar")).getByText("3 selected"),
+    ).toBeInTheDocument();
+
+    // Releasing ends the paint but keeps touch selection mode.
+    dispatchPointer(first, "pointerup", {
+      pointerType: "touch",
+      clientX: 300,
+      clientY: 10,
+    });
+    expect(selection()).toEqual([1, 2, 3]);
+    expect(
+      within(screen.getByRole("toolbar")).getByText("3 selected"),
+    ).toBeInTheDocument();
+
+    // Further movement after release does nothing.
+    dispatchPointer(first, "pointermove", {
+      pointerType: "touch",
+      clientX: 400,
+      clientY: 10,
+    });
+    expect(selection()).toEqual([1, 2, 3]);
+  });
+
+  it("stops painting when the pointer is cancelled", () => {
+    vi.useFakeTimers();
+    render(<PageView pageKey="test" />);
+    const first = getFileItem(1);
+
+    dispatchPointer(first, "pointerdown", {
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 10,
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    dispatchPointer(first, "pointermove", {
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 10,
+    });
+    expect(selection()).toEqual([1, 2]);
+
+    dispatchPointer(first, "pointercancel", {
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 10,
+    });
+    dispatchPointer(first, "pointermove", {
+      pointerType: "touch",
+      clientX: 300,
+      clientY: 10,
+    });
+
+    expect(selection()).toEqual([1, 2]);
+  });
+
+  it("never starts painting for a mouse pointer", () => {
+    vi.useFakeTimers();
+    render(<PageView pageKey="test" />);
+    const first = getFileItem(1);
+
+    dispatchPointer(first, "pointerdown", {
+      pointerType: "mouse",
+      button: 0,
+      clientX: 100,
+      clientY: 10,
+    });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(selection()).toEqual([]);
+
+    dispatchPointer(first, "pointermove", {
+      pointerType: "mouse",
+      clientX: 300,
+      clientY: 10,
+    });
+    expect(selection()).toEqual([]);
+    expect(screen.queryByRole("toolbar")).toBeNull();
+  });
+
+  it("blocks native touch scrolling only while painting", () => {
+    vi.useFakeTimers();
+    render(<PageView pageKey="test" />);
+    const first = getFileItem(1);
+
+    dispatchPointer(first, "pointerdown", {
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 10,
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const beforePaint = new Event("touchmove", {
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(beforePaint);
+    expect(beforePaint.defaultPrevented).toBe(false);
+
+    dispatchPointer(first, "pointermove", {
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 10,
+    });
+
+    const whilePainting = new Event("touchmove", {
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(whilePainting);
+    expect(whilePainting.defaultPrevented).toBe(true);
+
+    dispatchPointer(first, "pointerup", {
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 10,
+    });
+
+    const afterRelease = new Event("touchmove", {
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(afterRelease);
+    expect(afterRelease.defaultPrevented).toBe(false);
+  });
+
+  it("does not paint while the context menu is open", () => {
+    vi.useFakeTimers();
+    render(<PageView pageKey="test" />);
+    const first = getFileItem(1);
+
+    dispatchPointer(first, "pointerdown", {
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 10,
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    act(() => {
+      useContextMenuStore.getState().actions.openMenu({ x: 0, y: 0 }, []);
+    });
+
+    dispatchPointer(first, "pointermove", {
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 10,
+    });
+    expect(selection()).toEqual([1]);
+  });
+});
+
+describe("getEdgeScrollSpeed", () => {
+  it("does not scroll away from the edges", () => {
+    expect(getEdgeScrollSpeed(300, 0, 600)).toBe(0);
+  });
+
+  it("treats the threshold boundaries as no scroll", () => {
+    expect(getEdgeScrollSpeed(48, 0, 600)).toBe(0);
+    expect(getEdgeScrollSpeed(552, 0, 600)).toBe(0);
+  });
+
+  it("scrolls up near the top and down near the bottom", () => {
+    expect(getEdgeScrollSpeed(10, 0, 600)).toBeLessThan(0);
+    expect(getEdgeScrollSpeed(590, 0, 600)).toBeGreaterThan(0);
+  });
+
+  it("ramps up to the maximum speed at an edge", () => {
+    expect(getEdgeScrollSpeed(-20, 0, 600)).toBe(-TOUCH_DRAG_EDGE_MAX_SPEED);
+    expect(getEdgeScrollSpeed(620, 0, 600)).toBe(TOUCH_DRAG_EDGE_MAX_SPEED);
+  });
+});
+
+describe("PageView Archive/Delete filter scope", () => {
+  beforeEach(() => {
+    filterState.fileIds = [];
+    usePageStore.setState({
+      selectedFilesByPage: {},
+      activeFileByPage: {},
+    });
+    useContextMenuStore.getState().actions.closeMenu();
+  });
+
+  afterEach(() => {
+    act(() => {
+      useContextMenuStore.getState().actions.closeMenu();
+    });
+  });
+
+  function openFileMenu(fileId: number) {
+    const item = getFileItem(fileId);
+    dispatchPointer(item, "pointerdown", { pointerType: "mouse", button: 2 });
+    fireEvent.contextMenu(item, { clientX: 20, clientY: 20 });
+    return useContextMenuStore.getState().items;
+  }
+
+  it("filters only the selection from the selection-based entry", async () => {
+    render(<PageView pageKey="test" />);
+    const items = openFileMenu(2);
+    expect(selection()).toEqual([2]);
+
+    const entry = items.find((item) => item.id === "archive-delete-filter");
+    await act(async () => {
+      entry?.onClick?.();
+    });
+
+    await waitFor(() => expect(filterState.fileIds).toEqual([2]));
+  });
+
+  it("filters every file on the page from the whole-page entry", async () => {
+    render(<PageView pageKey="test" />);
+    const items = openFileMenu(2);
+    expect(selection()).toEqual([2]);
+
+    const entry = items.find(
+      (item) => item.id === "archive-delete-filter-page",
+    );
+    expect(entry?.label).toBe("Archive/Delete Filter (Whole Page)");
+    await act(async () => {
+      entry?.onClick?.();
+    });
+
+    await waitFor(() =>
+      expect(filterState.fileIds).toEqual([1, 2, 3, 4, 5, 6]),
+    );
   });
 });

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef } from "react";
 import type { PointerEventHandler } from "react";
 
 import {
+  SwipeAxis,
   SwipeDecision,
-  isHorizontalSwipe,
   isSwipePointerType,
+  resolveSwipeAxis,
   resolveSwipeRelease,
   swipeProgress,
 } from "./swipeGesture";
@@ -25,7 +26,9 @@ interface Gesture {
   startY: number;
   startedAt: number;
   mediaWidth: number;
-  horizontal: boolean;
+  mediaHeight: number;
+  /** Locked once the drag leaves the dead zone, so it owns one axis only. */
+  axis: SwipeAxis | null;
 }
 
 interface UseSwipeToDecideOptions {
@@ -78,6 +81,7 @@ export function useSwipeToDecide({
   const cardRef = useRef<HTMLDivElement>(null);
   const deleteLabelRef = useRef<HTMLDivElement>(null);
   const keepLabelRef = useRef<HTMLDivElement>(null);
+  const skipLabelRef = useRef<HTMLDivElement>(null);
 
   const gestureRef = useRef<Gesture | null>(null);
   const activePointersRef = useRef<Set<number>>(new Set());
@@ -94,14 +98,21 @@ export function useSwipeToDecide({
     }
   }, []);
 
-  const setLabelProgress = useCallback((progress: number) => {
-    if (deleteLabelRef.current) {
-      deleteLabelRef.current.style.opacity = String(Math.max(0, -progress));
-    }
-    if (keepLabelRef.current) {
-      keepLabelRef.current.style.opacity = String(Math.max(0, progress));
-    }
-  }, []);
+  const setLabelProgress = useCallback(
+    (horizontal: number, vertical: number) => {
+      if (deleteLabelRef.current) {
+        deleteLabelRef.current.style.opacity = String(Math.max(0, -horizontal));
+      }
+      if (keepLabelRef.current) {
+        keepLabelRef.current.style.opacity = String(Math.max(0, horizontal));
+      }
+      if (skipLabelRef.current) {
+        // Only an upward drag previews SKIP; downward drags decide nothing.
+        skipLabelRef.current.style.opacity = String(Math.max(0, -vertical));
+      }
+    },
+    [],
+  );
 
   const resetVisuals = useCallback(
     (animate: boolean) => {
@@ -111,7 +122,7 @@ export function useSwipeToDecide({
         card.style.transform = "";
         card.style.willChange = "";
       }
-      setLabelProgress(0);
+      setLabelProgress(0, 0);
     },
     [setLabelProgress],
   );
@@ -124,20 +135,35 @@ export function useSwipeToDecide({
   const commit = useCallback(
     (decision: SwipeDecision) => {
       committingRef.current = true;
-      const sign = decision === "delete" ? -1 : 1;
-      const distance = Math.max(
-        cardRef.current?.clientWidth ?? 0,
-        surfaceRef.current?.clientWidth ?? 0,
-        320,
-      );
       const card = cardRef.current;
       if (card) {
         card.style.transition = optionsRef.current.reduceMotion
           ? "none"
           : `transform ${COMMIT_ANIMATION_MS}ms ease-in`;
-        card.style.transform = `translate3d(${sign * (distance + 80)}px, 0, 0) rotate(${sign * 14}deg)`;
       }
-      setLabelProgress(sign);
+
+      if (decision === "skip") {
+        const distance = Math.max(
+          card?.clientHeight ?? 0,
+          surfaceRef.current?.clientHeight ?? 0,
+          320,
+        );
+        if (card) {
+          card.style.transform = `translate3d(0, ${-(distance + 80)}px, 0)`;
+        }
+        setLabelProgress(0, -1);
+      } else {
+        const sign = decision === "delete" ? -1 : 1;
+        const distance = Math.max(
+          card?.clientWidth ?? 0,
+          surfaceRef.current?.clientWidth ?? 0,
+          320,
+        );
+        if (card) {
+          card.style.transform = `translate3d(${sign * (distance + 80)}px, 0, 0) rotate(${sign * 14}deg)`;
+        }
+        setLabelProgress(sign, 0);
+      }
 
       const finish = () => {
         commitTimerRef.current = null;
@@ -184,7 +210,11 @@ export function useSwipeToDecide({
         startedAt: Date.now(),
         mediaWidth:
           cardRef.current?.clientWidth ?? surfaceRef.current?.clientWidth ?? 0,
-        horizontal: false,
+        mediaHeight:
+          cardRef.current?.clientHeight ??
+          surfaceRef.current?.clientHeight ??
+          0,
+        axis: null,
       };
 
       // Keep receiving moves if the finger leaves the surface.
@@ -216,21 +246,32 @@ export function useSwipeToDecide({
       const dx = event.clientX - gesture.startX;
       const dy = event.clientY - gesture.startY;
 
-      if (!gesture.horizontal) {
-        if (!isHorizontalSwipe(dx, dy)) {
-          // Below the dead zone or vertical-dominant: leave the media alone.
+      if (gesture.axis === null) {
+        const axis = resolveSwipeAxis(dx, dy);
+        if (axis === null) {
+          // Below the dead zone or too diagonal: leave the media alone.
           return;
         }
-        gesture.horizontal = true;
+        gesture.axis = axis;
       }
 
-      const progress = swipeProgress(dx, gesture.mediaWidth);
       const card = cardRef.current;
+      if (gesture.axis === "horizontal") {
+        const progress = swipeProgress(dx, gesture.mediaWidth);
+        if (card) {
+          card.style.transition = "none";
+          card.style.transform = `translate3d(${dx}px, 0, 0) rotate(${progress * 6}deg)`;
+        }
+        setLabelProgress(progress, 0);
+        return;
+      }
+
+      const progress = swipeProgress(dy, gesture.mediaHeight);
       if (card) {
         card.style.transition = "none";
-        card.style.transform = `translate3d(${dx}px, 0, 0) rotate(${progress * 6}deg)`;
+        card.style.transform = `translate3d(0, ${dy}px, 0)`;
       }
-      setLabelProgress(progress);
+      setLabelProgress(0, progress);
     },
     [cancelGesture, setLabelProgress],
   );
@@ -244,7 +285,7 @@ export function useSwipeToDecide({
       }
       gestureRef.current = null;
 
-      if (!gesture.horizontal) {
+      if (gesture.axis === null) {
         resetVisuals(true);
         return;
       }
@@ -259,6 +300,8 @@ export function useSwipeToDecide({
             dy: event.clientY - gesture.startY,
             elapsedMs: Date.now() - gesture.startedAt,
             mediaWidth: gesture.mediaWidth,
+            mediaHeight: gesture.mediaHeight,
+            axis: gesture.axis,
           })
         : null;
 
@@ -311,6 +354,7 @@ export function useSwipeToDecide({
     cardRef,
     deleteLabelRef,
     keepLabelRef,
+    skipLabelRef,
     handlers,
   };
 }

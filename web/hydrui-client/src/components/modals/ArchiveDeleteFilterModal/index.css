@@ -56,8 +56,11 @@
   overflow: hidden;
 }
 
-/* Swipe-to-decide surface. Vertical scrolling and browser pinch-zoom stay
-   available; horizontal drags are delivered to the gesture hook. */
+/* Swipe-to-decide surface. The browser may not pan: the surface is a
+   full-screen modal with nothing to scroll, and a vertical pan would steal the
+   vertical swipe and fire pointercancel. Pinch-zoom stays available so the
+   viewer's own two-finger zoom keeps working; the viewer's image element sets
+   touch-action: none for its custom pan/zoom. */
 .archive-delete-filter-swipe-surface {
   position: relative;
   width: 100%;
@@ -66,7 +69,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  touch-action: pan-y pinch-zoom;
+  touch-action: pinch-zoom;
 }
 
 .archive-delete-filter-swipe-card {
@@ -105,6 +108,14 @@
   right: 1.5rem;
   color: var(--color-green-400, #4ade80);
   transform: translateY(-50%) rotate(8deg);
+}
+
+/* Skip reads as neutral/amber and sits above the card, at the top edge. */
+.archive-delete-filter-swipe-label-skip {
+  top: 1.5rem;
+  left: 50%;
+  color: var(--color-yellow-400, #fbbf24);
+  transform: translateX(-50%) rotate(-4deg);
 }
 
 .archive-delete-filter-swipe-hint {
@@ -322,6 +333,10 @@
 
   .archive-delete-filter-swipe-label-keep {
     right: 0.75rem;
+  }
+
+  .archive-delete-filter-swipe-label-skip {
+    top: 0.75rem;
   }
 
   .archive-delete-filter-swipe-hint {

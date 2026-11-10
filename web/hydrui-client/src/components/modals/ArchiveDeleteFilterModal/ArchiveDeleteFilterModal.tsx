@@ -115,17 +115,30 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
 
   const handleSwipeDecision = useCallback((decision: SwipeDecision) => {
     setSwipeHintDismissed(true);
-    setFilter((state) =>
-      decision === "delete" ? deleteFile(state) : keepFile(state),
-    );
+    setFilter((state) => {
+      switch (decision) {
+        case "delete":
+          return deleteFile(state);
+        case "keep":
+          return keepFile(state);
+        case "skip":
+          return skipFile(state);
+      }
+    });
   }, []);
 
-  const { surfaceRef, cardRef, deleteLabelRef, keepLabelRef, handlers } =
-    useSwipeToDecide({
-      enabled: swipeEnabled,
-      reduceMotion,
-      onDecide: handleSwipeDecision,
-    });
+  const {
+    surfaceRef,
+    cardRef,
+    deleteLabelRef,
+    keepLabelRef,
+    skipLabelRef,
+    handlers,
+  } = useSwipeToDecide({
+    enabled: swipeEnabled,
+    reduceMotion,
+    onDecide: handleSwipeDecision,
+  });
 
   useEffect(() => {
     setIsMediaZoomed(false);
@@ -316,8 +329,8 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
             role="note"
             onClick={() => setSwipeHintDismissed(true)}
           >
-            <span aria-hidden="true">←</span> Swipe left to delete, right to
-            keep <span aria-hidden="true">→</span>
+            <span aria-hidden="true">← → ↑</span> Swipe left to delete, right to
+            keep, up to skip
             <span
               className="archive-delete-filter-swipe-hint-dismiss"
               aria-hidden="true"
@@ -360,6 +373,13 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
               aria-hidden="true"
             >
               KEEP
+            </div>
+            <div
+              ref={skipLabelRef}
+              className="archive-delete-filter-swipe-label archive-delete-filter-swipe-label-skip"
+              aria-hidden="true"
+            >
+              SKIP
             </div>
           </div>
         </div>

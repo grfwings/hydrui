@@ -14,7 +14,9 @@ import type { SwipeDecision } from "./swipeGesture";
 import { useSwipeToDecide } from "./useSwipeToDecide";
 
 const MEDIA_WIDTH = 400;
+const MEDIA_HEIGHT = 400;
 const THRESHOLD = MEDIA_WIDTH * 0.25;
+const VERTICAL_THRESHOLD = MEDIA_HEIGHT * 0.25;
 
 // jsdom has no PointerEvent, and fireEvent silently drops pointer fields when
 // the constructor is missing.
@@ -42,13 +44,20 @@ const Harness: React.FC<HarnessProps> = ({
   reduceMotion = true,
   onDecide,
 }) => {
-  const { surfaceRef, cardRef, deleteLabelRef, keepLabelRef, handlers } =
-    useSwipeToDecide({ enabled, reduceMotion, onDecide });
+  const {
+    surfaceRef,
+    cardRef,
+    deleteLabelRef,
+    keepLabelRef,
+    skipLabelRef,
+    handlers,
+  } = useSwipeToDecide({ enabled, reduceMotion, onDecide });
   return (
     <div ref={surfaceRef} data-testid="surface" {...handlers}>
       <div ref={cardRef} data-testid="card" />
       <div ref={deleteLabelRef} data-testid="delete-label" />
       <div ref={keepLabelRef} data-testid="keep-label" />
+      <div ref={skipLabelRef} data-testid="skip-label" />
       <button type="button" data-testid="video-control">
         Play
       </button>
@@ -64,6 +73,10 @@ function setup(props: Partial<HarnessProps> = {}) {
   Object.defineProperty(card, "clientWidth", {
     configurable: true,
     value: MEDIA_WIDTH,
+  });
+  Object.defineProperty(card, "clientHeight", {
+    configurable: true,
+    value: MEDIA_HEIGHT,
   });
   return { onDecide, surface };
 }
@@ -147,6 +160,61 @@ describe("useSwipeToDecide", () => {
 
     expect(onDecide).toHaveBeenCalledTimes(1);
     expect(onDecide).toHaveBeenCalledWith("keep");
+  });
+
+  it("skips on an upward swipe past the threshold", () => {
+    const { onDecide, surface } = setup({ reduceMotion: false });
+    swipe(surface, {
+      fromX: 300,
+      toX: 300,
+      fromY: 300,
+      toY: 300 - VERTICAL_THRESHOLD - 20,
+    });
+
+    expect(screen.getByTestId("card").style.transform).toContain("translate3d");
+    expect(onDecide).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(200);
+
+    expect(onDecide).toHaveBeenCalledTimes(1);
+    expect(onDecide).toHaveBeenCalledWith("skip");
+    expect(screen.getByTestId("card").style.transform).toBe("");
+  });
+
+  it("springs back without a decision on a downward swipe", () => {
+    const { onDecide, surface } = setup({ reduceMotion: false });
+    swipe(surface, {
+      fromX: 300,
+      toX: 300,
+      fromY: 300,
+      toY: 300 + VERTICAL_THRESHOLD + 20,
+    });
+
+    expect(onDecide).not.toHaveBeenCalled();
+    expect(screen.getByTestId("card").style.transform).toBe("");
+    expect(Number(screen.getByTestId("skip-label").style.opacity)).toBe(0);
+  });
+
+  it("fades the SKIP label in while dragging up", () => {
+    const { surface } = setup();
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 300,
+      clientY: 300,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 300,
+      clientY: 250,
+    });
+
+    expect(
+      Number(screen.getByTestId("skip-label").style.opacity),
+    ).toBeGreaterThan(0);
+    expect(Number(screen.getByTestId("delete-label").style.opacity)).toBe(0);
+    expect(Number(screen.getByTestId("keep-label").style.opacity)).toBe(0);
   });
 
   it("springs back without a decision for a small drag", () => {
@@ -255,5 +323,33 @@ describe("useSwipeToDecide", () => {
       Number(screen.getByTestId("delete-label").style.opacity),
     ).toBeGreaterThan(0);
     expect(Number(screen.getByTestId("keep-label").style.opacity)).toBe(0);
+  });
+
+  it("commits on the axis the drag locked onto, not the release vector", () => {
+    const { onDecide, surface } = setup();
+    vi.setSystemTime(0);
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 300,
+      clientY: 300,
+    });
+    // Clear horizontal dominance: this drag owns the horizontal axis even
+    // though it finishes back near the start and far upward.
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 300,
+    });
+    vi.setSystemTime(600);
+    fireEvent.pointerUp(surface, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 290,
+      clientY: 180,
+    });
+
+    expect(onDecide).not.toHaveBeenCalled();
   });
 });

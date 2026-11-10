@@ -18,6 +18,7 @@ import {
   PencilSquareIcon,
   PlusIcon,
   ShareIcon,
+  Squares2X2Icon,
   TagIcon,
   TrashIcon,
   WrenchScrewdriverIcon,
@@ -73,6 +74,7 @@ import {
   getViewerExitSelection,
   selectionIncludesIndex,
 } from "./selectionNavigation";
+import useTouchDragSelect from "./useTouchDragSelect";
 
 // Defines the amount of "scroll slack" used to compute item visibility for the
 // render view. This combats scroll jank at the cost of making rendering more
@@ -200,6 +202,19 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     showExpressionFilterModal ||
     showExpressionSortModal ||
     showArchiveDeleteFilter;
+
+  // Keep the touch drag guard current without re-registering its listeners.
+  const modalOpenRef = useRef(inModal);
+  useEffect(() => {
+    modalOpenRef.current = inModal;
+  }, [inModal]);
+  const canPaintTouchDragSelect = useCallback(() => !modalOpenRef.current, []);
+  const { begin: beginTouchDragSelect } = useTouchDragSelect({
+    pageKey,
+    gridRef,
+    canPaint: canPaintTouchDragSelect,
+  });
+
   const [renderView, setRenderView] = useState({
     firstIndex: 0,
     lastIndex: fileIds.length,
@@ -281,51 +296,63 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     [addToast, undeleteFiles],
   );
 
-  const launchArchiveDeleteFilter = useCallback(async () => {
-    const candidateFileIds = selectedFiles.length > 0 ? selectedFiles : fileIds;
-    if (candidateFileIds.length === 0) {
-      return;
-    }
+  const openArchiveDeleteFilter = useCallback(
+    async (candidateFileIds: number[]) => {
+      if (candidateFileIds.length === 0) {
+        return;
+      }
 
-    const candidateFileIdSet = new Set(candidateFileIds);
-    const orderedFileIds = fileIds.filter((fileId) =>
-      candidateFileIdSet.has(fileId),
-    );
-
-    try {
-      const metadata = metadataLoadController
-        ? await metadataLoadController.demandFetchMetadata(orderedFileIds)
-        : loadedFiles.filter((file) => candidateFileIdSet.has(file.file_id));
-      const metadataById = new Map(
-        metadata.map((file) => [file.file_id, file]),
+      const candidateFileIdSet = new Set(candidateFileIds);
+      const orderedFileIds = fileIds.filter((fileId) =>
+        candidateFileIdSet.has(fileId),
       );
-      const files = orderedFileIds
-        .map((fileId) => metadataById.get(fileId))
-        .filter((file): file is FileMetadata => file !== undefined)
-        .filter((file) => file.is_local === true && !file.is_trashed);
 
-      if (files.length === 0) {
-        return;
-      }
+      try {
+        const metadata = metadataLoadController
+          ? await metadataLoadController.demandFetchMetadata(orderedFileIds)
+          : loadedFiles.filter((file) => candidateFileIdSet.has(file.file_id));
+        const metadataById = new Map(
+          metadata.map((file) => [file.file_id, file]),
+        );
+        const files = orderedFileIds
+          .map((fileId) => metadataById.get(fileId))
+          .filter((file): file is FileMetadata => file !== undefined)
+          .filter((file) => file.is_local === true && !file.is_trashed);
 
-      archiveDeleteFilterOriginRef.current = { pageKey, pageType };
-      setArchiveDeleteFilterFiles(files);
-      setShowArchiveDeleteFilter(true);
-    } catch (e) {
-      if (e instanceof Error && e.message === "Canceled") {
-        return;
+        if (files.length === 0) {
+          return;
+        }
+
+        archiveDeleteFilterOriginRef.current = { pageKey, pageType };
+        setArchiveDeleteFilterFiles(files);
+        setShowArchiveDeleteFilter(true);
+      } catch (e) {
+        if (e instanceof Error && e.message === "Canceled") {
+          return;
+        }
+        addToast(`Error preparing Archive/Delete filter: ${e}`, "error");
       }
-      addToast(`Error preparing Archive/Delete filter: ${e}`, "error");
-    }
-  }, [
-    addToast,
-    fileIds,
-    loadedFiles,
-    metadataLoadController,
-    pageKey,
-    pageType,
-    selectedFiles,
-  ]);
+    },
+    [addToast, fileIds, loadedFiles, metadataLoadController, pageKey, pageType],
+  );
+
+  // Filters the selection when there is one, so the menu entry does the
+  // obvious thing whether or not the user selected files first. The selection
+  // is read when the entry runs: right-clicking an unselected file selects it
+  // just before the menu opens, so a captured value would be stale.
+  const launchArchiveDeleteFilter = useCallback(() => {
+    const currentSelection =
+      usePageStore.getState().selectedFilesByPage[pageKey] ?? [];
+    return openArchiveDeleteFilter(
+      currentSelection.length > 0 ? currentSelection : fileIds,
+    );
+  }, [fileIds, openArchiveDeleteFilter, pageKey]);
+
+  // Filters every file on the page, ignoring the current selection.
+  const launchArchiveDeleteFilterForPage = useCallback(
+    () => openArchiveDeleteFilter(fileIds),
+    [fileIds, openArchiveDeleteFilter],
+  );
 
   const closeArchiveDeleteFilter = useCallback(
     (didSave: boolean) => {
@@ -437,6 +464,12 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       label: "Archive/Delete Filter",
       icon: <FunnelIcon />,
       onClick: launchArchiveDeleteFilter,
+    },
+    {
+      id: "archive-delete-filter-page",
+      label: "Archive/Delete Filter (Whole Page)",
+      icon: <Squares2X2Icon />,
+      onClick: launchArchiveDeleteFilterForPage,
     },
     {
       id: "divider5",
@@ -889,8 +922,11 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       setTouchSelectionMode(true);
       setSelectedFiles(pageKey, [fileId], { offerRestore: false });
       setActiveFileId(pageKey, fileId);
+      // If the finger keeps moving, paint the thumbnails it passes over.
+      beginTouchDragSelect(event);
     },
     [
+      beginTouchDragSelect,
       pageKey,
       setActiveFileId,
       setSelectedFiles,
