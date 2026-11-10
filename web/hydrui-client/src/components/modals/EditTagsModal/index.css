@@ -362,11 +362,6 @@
   background-color: var(--color-gray-800);
 }
 
-.edit-tags-modal-autotag-backend {
-  color: var(--color-gray-400);
-  font-size: 0.875rem;
-}
-
 @media (max-width: 640px) {
   .edit-tags-modal-autotag-form-row {
     flex-direction: column;

@@ -11,22 +11,6 @@ import {
 } from "./camie";
 import { getCacheKey, relativeUrl } from "./common";
 import {
-  type HarukaMetadata,
-  deleteSavedHarukaFiles,
-  fetchModelFilesHaruka,
-  isHarukaMetadata,
-  loadHarukaModelFromZip,
-  parseModelInfoHaruka,
-} from "./haruka";
-import {
-  type PixAIModelConfig,
-  deleteSavedPixAIFiles,
-  fetchModelFilesPixAI,
-  isPixAIConfig,
-  loadPixAIModelFromZip,
-  parseModelInfoPixAI,
-} from "./pixai";
-import {
   type WDTaggerModelInfo,
   deleteSavedWDFiles,
   fetchModelFilesWD,
@@ -34,45 +18,13 @@ import {
   parseModelInfoWD,
 } from "./wd";
 
-interface ModelFileNaming {
-  extension: "onnx" | "ort";
-  resolveModelFile: (modelFile: string) => string;
-}
-
-const MODEL_FILE_NAMING: Record<TagModelMeta["type"], ModelFileNaming> = {
-  wd: {
-    extension: "ort",
-    resolveModelFile: (modelFile) => modelFile.replace(".onnx", ".ort"),
-  },
-  camie: {
-    extension: "ort",
-    resolveModelFile: (modelFile) => modelFile.replace(".onnx", ".ort"),
-  },
-  haruka: {
-    extension: "onnx",
-    resolveModelFile: (modelFile) => modelFile,
-  },
-  pixai: {
-    extension: "onnx",
-    resolveModelFile: (modelFile) => modelFile,
-  },
-};
-
 export async function fetchModelInfo(url: string): Promise<TagModelMeta> {
   const infoResponse = await fetch(url);
-  const info:
-    | WDTaggerModelInfo
-    | CamieMetadata
-    | HarukaMetadata
-    | PixAIModelConfig = await infoResponse.json();
+  const info: WDTaggerModelInfo | CamieMetadata = await infoResponse.json();
   if ("model_info" in info && info?.model_info?.architecture) {
     return parseModelInfoCamie(url, info);
   } else if ("modelname" in info) {
     return parseModelInfoWD(url, info);
-  } else if (isHarukaMetadata(info)) {
-    return parseModelInfoHaruka(url, info);
-  } else if (isPixAIConfig(info)) {
-    return parseModelInfoPixAI(url, info);
   } else {
     throw new Error("Unrecognized model info format.");
   }
@@ -101,17 +53,10 @@ export async function fetchModelFiles(
     case "camie":
       modelFile = await fetchModelFilesCamie(meta);
       break;
-    case "haruka":
-      modelFile = await fetchModelFilesHaruka(meta);
-      break;
-    case "pixai":
-      modelFile = await fetchModelFilesPixAI(meta);
-      break;
   }
   // Fetch the actual ONNX model weights
-  const naming = MODEL_FILE_NAMING[meta.type];
-  const cachedModelName = `tagModels-${cacheKey}-model.${naming.extension}`;
-  const modelUrl = relativeUrl(meta.url, naming.resolveModelFile(modelFile));
+  const cachedModelName = `tagModels-${cacheKey}-model.ort`;
+  const modelUrl = relativeUrl(meta.url, modelFile.replace(".onnx", ".ort"));
   const modelResponse = await fetch(modelUrl);
   try {
     const fileHandle = await opfsRoot.getFileHandle(cachedModelName, {
@@ -146,12 +91,6 @@ export async function deleteSavedFiles(meta: TagModelMeta) {
     case "camie":
       deleteSavedCamieFiles(meta);
       break;
-    case "haruka":
-      deleteSavedHarukaFiles(meta);
-      break;
-    case "pixai":
-      deleteSavedPixAIFiles(meta);
-      break;
   }
 }
 
@@ -167,10 +106,6 @@ export async function setupZippedTagModel(zip: Blob): Promise<TagModelMeta> {
   for (const entry of entries) {
     fileMap.set(entry.filename, entry);
   }
-  const harukaModel = await loadHarukaModelFromZip(entries, fileMap);
-  if (harukaModel !== null) {
-    return harukaModel;
-  }
   const camieModel = await loadCamieModelFromZip(entries, fileMap);
   if (camieModel !== null) {
     return camieModel;
@@ -179,11 +114,7 @@ export async function setupZippedTagModel(zip: Blob): Promise<TagModelMeta> {
   if (wdModel !== null) {
     return wdModel;
   }
-  const pixaiModel = await loadPixAIModelFromZip(entries, fileMap);
-  if (pixaiModel !== null) {
-    return pixaiModel;
-  }
   throw new Error(
-    "Could not find model info in ZIP file (No WD info.json, no Camie or Haruka metadata.json, no PixAI config.json)",
+    "Could not find model info in ZIP file (No WD info.json, no Camie metadata.json)",
   );
 }

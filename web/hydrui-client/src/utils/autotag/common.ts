@@ -22,72 +22,13 @@ const KNOWN_KAOMOJI = new Set([
   "||_||",
 ]);
 
-export type AutotagBackend = "webgpu" | "wasm";
-
 export interface SessionCommon {
   modelSession: InferenceSession;
   targetSize: number;
-  backend: AutotagBackend;
 }
 
 export interface Results {
   tagResults: { name: string; confidence: number }[];
-  backend?: AutotagBackend;
-}
-
-export interface LetterboxRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export function computeLetterboxRect(
-  imageWidth: number,
-  imageHeight: number,
-  targetSize: number,
-): LetterboxRect {
-  const scale = Math.min(targetSize / imageWidth, targetSize / imageHeight);
-  const width = Math.max(1, Math.round(imageWidth * scale));
-  const height = Math.max(1, Math.round(imageHeight * scale));
-  return {
-    x: Math.floor((targetSize - width) / 2),
-    y: Math.floor((targetSize - height) / 2),
-    width,
-    height,
-  };
-}
-
-export function getExecutionProviders(
-  preferWebGPU: boolean,
-  hasWebGPU: boolean,
-): AutotagBackend[] {
-  return preferWebGPU && hasWebGPU ? ["webgpu", "wasm"] : ["wasm"];
-}
-
-export async function createInferenceSession(
-  modelData: ArrayBuffer,
-  preferWebGPU: boolean,
-): Promise<{ session: InferenceSession; backend: AutotagBackend }> {
-  const { InferenceSession } = await import("onnxruntime-web");
-  const hasWebGPU = typeof navigator !== "undefined" && "gpu" in navigator;
-  const executionProviders = getExecutionProviders(preferWebGPU, hasWebGPU);
-  if (executionProviders[0] === "webgpu") {
-    try {
-      const session = await InferenceSession.create(modelData, {
-        executionProviders,
-      });
-      return { session, backend: "webgpu" };
-    } catch (error) {
-      console.warn(
-        `WebGPU inference session creation failed; falling back to the CPU: ${error}`,
-      );
-    }
-  }
-  const session = await InferenceSession.create(modelData, {
-    executionProviders: ["wasm"],
-  });
-  return { session, backend: "wasm" };
 }
 
 export function relativeUrl(urlString: URL | string, path: string): URL {
@@ -106,23 +47,6 @@ export function joinTagNamespace(name: string, namespace: string): string {
       : name;
 }
 
-export function getTagNamespaceForCategory(category: string): string {
-  switch (category) {
-    case "general":
-      return "";
-    case "artist":
-      return "creator";
-    case "copyright":
-      return "series";
-    default:
-      return category;
-  }
-}
-
-export function sigmoid(x: number): number {
-  return 1.0 / (1.0 + Math.exp(-x));
-}
-
 export async function getCacheKey(name: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(name);
@@ -132,17 +56,6 @@ export async function getCacheKey(name: string): Promise<string> {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("")
     .substring(0, 16);
-}
-
-export async function writeOpfsFile(
-  path: string,
-  data: BlobPart,
-): Promise<void> {
-  const opfsRoot = await navigator.storage.getDirectory();
-  const fileHandle = await opfsRoot.getFileHandle(path, { create: true });
-  const writable = await fileHandle.createWritable();
-  await writable.write(new Blob([data]));
-  await writable.close();
 }
 
 export function createCanvas(

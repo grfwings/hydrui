@@ -6,13 +6,10 @@ import {
   Results,
   SessionCommon,
   createCanvas,
-  createInferenceSession,
   getCacheKey,
   getCanvasContext2D,
-  getTagNamespaceForCategory,
   joinTagNamespace,
   rewriteUnderscoreTags,
-  sigmoid,
 } from "./common";
 
 const CAMIE_TARGET_SIZE = 512;
@@ -155,6 +152,23 @@ export async function preprocessImageCamie(
   return new Tensor("float32", tensor, [1, 3, targetSize, targetSize]);
 }
 
+function sigmoid(x: number): number {
+  return 1.0 / (1.0 + Math.exp(-x));
+}
+
+function getTagNamespaceForCategory(category: string): string {
+  switch (category) {
+    case "general":
+      return "";
+    case "artist":
+      return "creator";
+    case "copyright":
+      return "series";
+    default:
+      return category;
+  }
+}
+
 export function processResultsCamie(
   session: CamieTaggerSession,
   logits: Float32Array,
@@ -206,25 +220,23 @@ export function processResultsCamie(
 
 export async function loadModelCamie(
   meta: CamieTaggerModelMeta,
-  preferWebGPU = true,
 ): Promise<CamieTaggerSession> {
   if (!meta.modelPath || !meta.metadataPath) {
     throw new Error("Model data is not cached.");
   }
+  const { InferenceSession } = await import("onnxruntime-web");
   const opfsRoot = await navigator.storage.getDirectory();
   const model = await opfsRoot.getFileHandle(meta.modelPath);
   const modelData = await model.getFile();
   const metadataFile = await opfsRoot.getFileHandle(meta.metadataPath);
   const metadataText = await (await metadataFile.getFile()).text();
   const metadata: CamieMetadata = JSON.parse(metadataText);
-  const { session, backend } = await createInferenceSession(
+  const modelSession = await InferenceSession.create(
     await modelData.arrayBuffer(),
-    preferWebGPU,
   );
   return {
     targetSize: CAMIE_TARGET_SIZE,
-    modelSession: session,
-    backend,
+    modelSession,
     modelType: "camie",
     metadata,
   };

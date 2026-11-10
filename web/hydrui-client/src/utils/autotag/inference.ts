@@ -10,29 +10,13 @@ import {
 } from "./camie";
 import { type Results } from "./common";
 import {
-  type HarukaTaggerSession,
-  loadModelHaruka,
-  preprocessImageHaruka,
-  processResultsHaruka,
-} from "./haruka";
-import {
-  type PixAITaggerSession,
-  loadModelPixAI,
-  preprocessImagePixAI,
-  processResultsPixAI,
-} from "./pixai";
-import {
   type WDTaggerSession,
   loadModelWD,
   preprocessImageWD,
   processResultsWD,
 } from "./wd";
 
-export type Session =
-  | WDTaggerSession
-  | CamieTaggerSession
-  | HarukaTaggerSession
-  | PixAITaggerSession;
+export type Session = WDTaggerSession | CamieTaggerSession;
 
 async function preprocessImage(session: Session, image: ImageBitmap) {
   switch (session.modelType) {
@@ -40,10 +24,6 @@ async function preprocessImage(session: Session, image: ImageBitmap) {
       return preprocessImageWD(session, image);
     case "camie":
       return preprocessImageCamie(session, image);
-    case "haruka":
-      return preprocessImageHaruka(session, image);
-    case "pixai":
-      return preprocessImagePixAI(session, image);
   }
 }
 
@@ -57,10 +37,6 @@ function processResults(
       return processResultsWD(session, confidences, threshold);
     case "camie":
       return processResultsCamie(session, confidences, threshold);
-    case "haruka":
-      return processResultsHaruka(session, confidences, threshold);
-    case "pixai":
-      return processResultsPixAI(session, confidences, threshold);
   }
 }
 
@@ -83,7 +59,6 @@ export async function processImage(
     switch (output.name) {
       case "refined_predictions": // Camie v2
       case "predictions_sigmoid": // SmilingWolf
-      case "logits": // Haruka
       case "prediction": {
         // PixAI
         const result = results[output.name];
@@ -111,28 +86,18 @@ export async function processImage(
   if (!confidences) {
     throw new Error(`Unable to find Float32Array for tensor output!`);
   }
-  return {
-    ...processResults(session, confidences, threshold),
-    backend: session.backend,
-  };
+  return processResults(session, confidences, threshold);
 }
 
-export async function loadModel(
-  meta: TagModelMeta,
-  preferWebGPU = true,
-): Promise<Session> {
+export async function loadModel(meta: TagModelMeta): Promise<Session> {
   if (!navigator.storage || !navigator.storage.getDirectory) {
     throw new Error("Origin Private File System is not available!");
   }
   switch (meta.type) {
     case "wd":
-      return loadModelWD(meta, preferWebGPU);
+      return loadModelWD(meta);
     case "camie":
-      return loadModelCamie(meta, preferWebGPU);
-    case "haruka":
-      return loadModelHaruka(meta, preferWebGPU);
-    case "pixai":
-      return loadModelPixAI(meta, preferWebGPU);
+      return loadModelCamie(meta);
   }
 }
 

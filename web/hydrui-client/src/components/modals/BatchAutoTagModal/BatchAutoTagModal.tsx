@@ -9,15 +9,11 @@ import { REAL_TAG_SERVICES } from "@/constants/services";
 import { renderDispatch } from "@/file/renderers";
 import { useShortcut } from "@/hooks/useShortcut";
 import { client } from "@/store/apiStore";
-import {
-  modelUsesCategoryThresholds,
-  useModelMetaStore,
-} from "@/store/modelMetaStore";
+import { useModelMetaStore } from "@/store/modelMetaStore";
 import { usePageActions } from "@/store/pageStore";
 import { useServices } from "@/store/servicesStore";
 import { useToastActions } from "@/store/toastStore";
 import { useUIStateStore } from "@/store/uiStateStore";
-import { type AutotagBackend } from "@/utils/autotag/common";
 import { type AutotagWorker } from "@/utils/autotag/worker";
 import { isServerMode } from "@/utils/modes";
 
@@ -46,10 +42,6 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
   } = useModelMetaStore();
   const { addToast, removeToast, updateToastProgress } = useToastActions();
   const [activeServiceKey, setActiveServiceKey] = useState<string | null>(null);
-  const [backend, setBackend] = useState<AutotagBackend | null>(null);
-  const selectedModel = autotagModel ? tagModels[autotagModel] : undefined;
-  const usesCategoryThresholds =
-    selectedModel !== undefined && modelUsesCategoryThresholds(selectedModel);
 
   const tagServices = useMemo(
     () =>
@@ -128,7 +120,6 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
       addToast(`Error loading autotag model: ${e}.`, "error");
       return;
     }
-    setBackend(worker.backend);
     onClose();
     try {
       let added = 0;
@@ -149,9 +140,6 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
           { ...file },
         );
         const result = await worker.processImage(autotagThreshold, bitmap);
-        if (result.backend) {
-          setBackend(result.backend);
-        }
         const existingTags = new Set<string>();
         let hasRating = false;
         const serviceTags =
@@ -281,50 +269,34 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
                     </p>
                   </div>
                 </div>
-                {backend ? (
-                  <div className="batch-autotag-modal-form-row">
-                    <p className="batch-autotag-modal-backend">
-                      Running on {backend === "webgpu" ? "WebGPU" : "the CPU"}
-                    </p>
+                <div className="batch-autotag-modal-form-row">
+                  <label>Threshold</label>
+                  <div className="batch-autotag-modal-form-control">
+                    <input
+                      className="batch-autotag-modal-number-input"
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={autotagThreshold}
+                      onChange={(e) =>
+                        setAutotagThreshold(Number(e.currentTarget.value))
+                      }
+                      inputMode="decimal"
+                    />
+                    <input
+                      className="batch-autotag-modal-range-input"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={autotagThreshold}
+                      onChange={(e) =>
+                        setAutotagThreshold(Number(e.currentTarget.value))
+                      }
+                    />
                   </div>
-                ) : undefined}
-                {usesCategoryThresholds ? (
-                  <div className="batch-autotag-modal-form-row">
-                    <p>
-                      This model uses its own per-category thresholds; the
-                      threshold slider is not used.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="batch-autotag-modal-form-row">
-                    <label>Threshold</label>
-                    <div className="batch-autotag-modal-form-control">
-                      <input
-                        className="batch-autotag-modal-number-input"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={autotagThreshold}
-                        onChange={(e) =>
-                          setAutotagThreshold(Number(e.currentTarget.value))
-                        }
-                        inputMode="decimal"
-                      />
-                      <input
-                        className="batch-autotag-modal-range-input"
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={autotagThreshold}
-                        onChange={(e) =>
-                          setAutotagThreshold(Number(e.currentTarget.value))
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
 

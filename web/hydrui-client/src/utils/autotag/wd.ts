@@ -9,7 +9,6 @@ import {
   Results,
   SessionCommon,
   createCanvas,
-  createInferenceSession,
   getCanvasContext2D,
   joinTagNamespace,
   relativeUrl,
@@ -275,26 +274,24 @@ export function processResultsWD(
 
 export async function loadModelWD(
   meta: WDTaggerModelMeta,
-  preferWebGPU = true,
 ): Promise<WDTaggerSession> {
   if (!meta.modelPath || !meta.tagsPath || !meta.info) {
     throw new Error("Model data is not cached.");
   }
+  const { InferenceSession } = await import("onnxruntime-web");
   const opfsRoot = await navigator.storage.getDirectory();
   const model = await opfsRoot.getFileHandle(meta.modelPath);
   const modelData = await model.getFile();
   let tagsData: Record<string, string>[] = [];
   const tags = await opfsRoot.getFileHandle(meta.tagsPath);
   tagsData = parseCsv(await (await tags.getFile()).text());
-  const { session, backend } = await createInferenceSession(
+  const modelSession = await InferenceSession.create(
     await modelData.arrayBuffer(),
-    preferWebGPU,
   );
   return {
     targetSize: WD_TARGET_SIZE,
     modelInfo: meta.info,
-    modelSession: session,
-    backend,
+    modelSession,
     tagsData,
     modelType: "wd",
   };
