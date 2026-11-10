@@ -24,6 +24,7 @@ const viewerState = vi.hoisted(() => ({
 
 const filterState = vi.hoisted(() => ({
   fileIds: [] as number[],
+  excludedCount: 0,
 }));
 
 vi.mock("@/store/pageStore", async () => {
@@ -172,8 +173,15 @@ vi.mock("@/components/modals/FileViewerModal/FileViewerModal", () => ({
 vi.mock(
   "@/components/modals/ArchiveDeleteFilterModal/ArchiveDeleteFilterModal",
   () => ({
-    default: ({ files }: { files: { file_id: number }[] }) => {
+    default: ({
+      files,
+      excludedCount,
+    }: {
+      files: { file_id: number }[];
+      excludedCount?: number;
+    }) => {
       filterState.fileIds = files.map((file) => file.file_id);
+      filterState.excludedCount = excludedCount ?? 0;
       return null;
     },
   }),
@@ -651,9 +659,16 @@ describe("getEdgeScrollSpeed", () => {
 describe("PageView Archive/Delete filter scope", () => {
   beforeEach(() => {
     filterState.fileIds = [];
+    filterState.excludedCount = 0;
     usePageStore.setState({
       selectedFilesByPage: {},
       activeFileByPage: {},
+      loadedFiles: [1, 2, 3, 4, 5, 6].map((fileId) => ({
+        file_id: fileId,
+        hash: `hash-${fileId}`,
+        is_local: true,
+        is_trashed: false,
+      })),
     });
     useContextMenuStore.getState().actions.closeMenu();
   });
@@ -684,15 +699,18 @@ describe("PageView Archive/Delete filter scope", () => {
     await waitFor(() => expect(filterState.fileIds).toEqual([2]));
   });
 
-  it("filters every file on the page from the whole-page entry", async () => {
+  it("filters every file on the page when nothing is selected", async () => {
     render(<PageView pageKey="test" />);
-    const items = openFileMenu(2);
-    expect(selection()).toEqual([2]);
+    const grid = document.querySelector(".files-grid");
+    if (!(grid instanceof Element)) throw new Error("grid not found");
+    dispatchPointer(grid, "pointerdown", { pointerType: "mouse", button: 2 });
+    fireEvent.contextMenu(grid, { clientX: 20, clientY: 20 });
 
-    const entry = items.find(
-      (item) => item.id === "archive-delete-filter-page",
+    const items = useContextMenuStore.getState().items;
+    expect(items.some((item) => item.id === "archive-delete-filter-page")).toBe(
+      false,
     );
-    expect(entry?.label).toBe("Archive/Delete Filter (Whole Page)");
+    const entry = items.find((item) => item.id === "archive-delete-filter");
     await act(async () => {
       entry?.onClick?.();
     });
@@ -700,5 +718,40 @@ describe("PageView Archive/Delete filter scope", () => {
     await waitFor(() =>
       expect(filterState.fileIds).toEqual([1, 2, 3, 4, 5, 6]),
     );
+  });
+
+  it("limits a whole-page filter to files whose metadata is loaded", async () => {
+    usePageStore.setState({
+      loadedFiles: [
+        {
+          file_id: 1,
+          hash: "hash-1",
+          is_local: true,
+          is_trashed: false,
+        },
+        {
+          file_id: 2,
+          hash: "hash-2",
+          is_local: true,
+          is_trashed: false,
+        },
+      ],
+    });
+
+    render(<PageView pageKey="test" />);
+    const grid = document.querySelector(".files-grid");
+    if (!(grid instanceof Element)) throw new Error("grid not found");
+    dispatchPointer(grid, "pointerdown", { pointerType: "mouse", button: 2 });
+    fireEvent.contextMenu(grid, { clientX: 20, clientY: 20 });
+
+    const entry = useContextMenuStore
+      .getState()
+      .items.find((item) => item.id === "archive-delete-filter");
+    await act(async () => {
+      entry?.onClick?.();
+    });
+
+    await waitFor(() => expect(filterState.fileIds).toEqual([1, 2]));
+    expect(filterState.excludedCount).toBe(4);
   });
 });

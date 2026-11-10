@@ -158,6 +158,26 @@ describe("ArchiveDeleteFilterModal", () => {
     expect(apiMocks.getFileUrl).not.toHaveBeenCalled();
   });
 
+  it("notes files on the page that are not loaded yet", () => {
+    render(
+      <ArchiveDeleteFilterModal
+        files={makeFiles(2)}
+        excludedCount={5}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText(/5 more files are on this page but not loaded yet/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no note when every file is loaded", () => {
+    render(<ArchiveDeleteFilterModal files={makeFiles(2)} onClose={vi.fn()} />);
+
+    expect(screen.queryByText(/not loaded yet/)).toBeNull();
+  });
+
   it("does not write files before the user commits", async () => {
     const onClose = vi.fn();
     render(<ArchiveDeleteFilterModal files={makeFiles(2)} onClose={onClose} />);

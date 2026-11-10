@@ -18,7 +18,6 @@ import {
   PencilSquareIcon,
   PlusIcon,
   ShareIcon,
-  Squares2X2Icon,
   TagIcon,
   TrashIcon,
   WrenchScrewdriverIcon,
@@ -179,6 +178,10 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
   const [archiveDeleteFilterFiles, setArchiveDeleteFilterFiles] = useState<
     FileMetadata[]
   >([]);
+  const [
+    archiveDeleteFilterExcludedCount,
+    setArchiveDeleteFilterExcludedCount,
+  ] = useState(0);
   const archiveDeleteFilterOriginRef = useRef<{
     pageKey: string;
     pageType: PageType;
@@ -297,7 +300,7 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
   );
 
   const openArchiveDeleteFilter = useCallback(
-    async (candidateFileIds: number[]) => {
+    async (candidateFileIds: number[], demandMetadata: boolean) => {
       if (candidateFileIds.length === 0) {
         return;
       }
@@ -307,10 +310,34 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
         candidateFileIdSet.has(fileId),
       );
 
+      const loadedById = new Map(
+        usePageStore
+          .getState()
+          .loadedFiles.filter(
+            (file): file is FileMetadata => file !== undefined,
+          )
+          .map((file) => [file.file_id, file]),
+      );
+
       try {
-        const metadata = metadataLoadController
-          ? await metadataLoadController.demandFetchMetadata(orderedFileIds)
-          : loadedFiles.filter((file) => candidateFileIdSet.has(file.file_id));
+        // A whole-page filter only covers what is already loaded. Demanding
+        // metadata for a large page would block behind the loading toast for
+        // every chunk, and the unloaded tail is usually only the part past the
+        // eager-load threshold.
+        const metadata = demandMetadata
+          ? metadataLoadController
+            ? await metadataLoadController.demandFetchMetadata(orderedFileIds)
+            : orderedFileIds
+                .map((fileId) => loadedById.get(fileId))
+                .filter((file): file is FileMetadata => file !== undefined)
+          : orderedFileIds
+              .map((fileId) => loadedById.get(fileId))
+              .filter((file): file is FileMetadata => file !== undefined);
+
+        const missingMetadataCount = orderedFileIds.filter(
+          (fileId) => !loadedById.has(fileId),
+        ).length;
+
         const metadataById = new Map(
           metadata.map((file) => [file.file_id, file]),
         );
@@ -320,11 +347,13 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
           .filter((file) => file.is_local === true && !file.is_trashed);
 
         if (files.length === 0) {
+          addToast("No loaded files to filter on this page.", "info");
           return;
         }
 
         archiveDeleteFilterOriginRef.current = { pageKey, pageType };
         setArchiveDeleteFilterFiles(files);
+        setArchiveDeleteFilterExcludedCount(missingMetadataCount);
         setShowArchiveDeleteFilter(true);
       } catch (e) {
         if (e instanceof Error && e.message === "Canceled") {
@@ -333,31 +362,25 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
         addToast(`Error preparing Archive/Delete filter: ${e}`, "error");
       }
     },
-    [addToast, fileIds, loadedFiles, metadataLoadController, pageKey, pageType],
+    [addToast, fileIds, metadataLoadController, pageKey, pageType],
   );
 
-  // Filters the selection when there is one, so the menu entry does the
-  // obvious thing whether or not the user selected files first. The selection
-  // is read when the entry runs: right-clicking an unselected file selects it
-  // just before the menu opens, so a captured value would be stale.
+  // Filters the selection when there is one and the whole page otherwise. The
+  // selection is read when the entry runs: right-clicking an unselected file
+  // selects it just before the menu opens, so a captured value would be stale.
   const launchArchiveDeleteFilter = useCallback(() => {
     const currentSelection =
       usePageStore.getState().selectedFilesByPage[pageKey] ?? [];
-    return openArchiveDeleteFilter(
-      currentSelection.length > 0 ? currentSelection : fileIds,
-    );
+    return currentSelection.length > 0
+      ? openArchiveDeleteFilter(currentSelection, true)
+      : openArchiveDeleteFilter(fileIds, false);
   }, [fileIds, openArchiveDeleteFilter, pageKey]);
-
-  // Filters every file on the page, ignoring the current selection.
-  const launchArchiveDeleteFilterForPage = useCallback(
-    () => openArchiveDeleteFilter(fileIds),
-    [fileIds, openArchiveDeleteFilter],
-  );
 
   const closeArchiveDeleteFilter = useCallback(
     (didSave: boolean) => {
       setShowArchiveDeleteFilter(false);
       setArchiveDeleteFilterFiles([]);
+      setArchiveDeleteFilterExcludedCount(0);
 
       const origin = archiveDeleteFilterOriginRef.current;
       archiveDeleteFilterOriginRef.current = null;
@@ -464,12 +487,6 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       label: "Archive/Delete Filter",
       icon: <FunnelIcon />,
       onClick: launchArchiveDeleteFilter,
-    },
-    {
-      id: "archive-delete-filter-page",
-      label: "Archive/Delete Filter (Whole Page)",
-      icon: <Squares2X2Icon />,
-      onClick: launchArchiveDeleteFilterForPage,
     },
     {
       id: "divider5",
@@ -2306,6 +2323,7 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       {showArchiveDeleteFilter && archiveDeleteFilterFiles.length > 0 && (
         <ArchiveDeleteFilterModal
           files={archiveDeleteFilterFiles}
+          excludedCount={archiveDeleteFilterExcludedCount}
           onClose={closeArchiveDeleteFilter}
         />
       )}

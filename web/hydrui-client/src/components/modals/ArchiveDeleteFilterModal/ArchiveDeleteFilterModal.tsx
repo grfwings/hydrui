@@ -54,11 +54,17 @@ interface ApplyError {
 
 interface ArchiveDeleteFilterModalProps {
   files: FileMetadata[];
+  /**
+   * Files on the page that have no metadata loaded yet and are therefore not
+   * part of this filter.
+   */
+  excludedCount?: number;
   onClose: (didSave: boolean) => void;
 }
 
 const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
   files,
+  excludedCount = 0,
   onClose,
 }) => {
   const [filter, setFilter] = useState<ArchiveDeleteFilterState>(() =>
@@ -322,6 +328,14 @@ const ArchiveDeleteFilterModal: React.FC<ArchiveDeleteFilterModalProps> = ({
             </span>
           </div>
         </div>
+
+        {excludedCount > 0 && (
+          <div className="archive-delete-filter-note" role="note">
+            {excludedCount} more file{excludedCount === 1 ? " is" : "s are"} on
+            this page but not loaded yet, so{" "}
+            {excludedCount === 1 ? "it is" : "they are"} not included.
+          </div>
+        )}
 
         {showSwipeHint && (
           <div
