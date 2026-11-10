@@ -53,6 +53,42 @@ const pixaiConfig = {
   category_best_threshold: { general: 0.2 },
 };
 
+const pixaiPreprocess = {
+  stages: [
+    { type: "rescale_pad", size: 1008, pad_value: 0 },
+    { type: "normalize", mean: [0.5, 0.5, 0.5], std: [0.5, 0.5, 0.5] },
+  ],
+};
+
+const selectedTagsCsv = [
+  "tag_id,name,category,count",
+  "1,1girl,0,100",
+  "2,hatsune_miku,4,50",
+  "3,vocaloid,3,20",
+  "4,some_style,1,5",
+  "5,meta_tag,5,1",
+  "6,rating:s,9,2",
+].join("\n");
+
+function mockPixAIPreprocessFetch() {
+  const requestedUrls: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      requestedUrls.push(url);
+      if (url.endsWith("selected_tags.csv")) {
+        return { ok: true, text: async () => selectedTagsCsv };
+      }
+      if (url.endsWith("model_int8.onnx") || url.endsWith("model.onnx")) {
+        return { ok: true, blob: async () => new Blob(["model"]) };
+      }
+      return { ok: true, json: async () => pixaiPreprocess };
+    }),
+  );
+  return requestedUrls;
+}
+
 describe("fetchModelInfo", () => {
   beforeEach(() => {
     installOpfsMock();
@@ -99,6 +135,25 @@ describe("fetchModelInfo", () => {
     }
     expect(meta.name).toBe("PixAI Tagger v1.0");
     expect(meta.configPath).toMatch(/^tagModels-[0-9a-f]{16}-config\.json$/);
+  });
+
+  it("recognises a PixAI preprocess descriptor as the INT8 model", async () => {
+    mockPixAIPreprocessFetch();
+    const meta = await fetchModelInfo("https://example.com/preprocess.json");
+    expect(meta.type).toBe("pixai");
+    if (meta.type !== "pixai") {
+      throw new Error("Expected PixAI model metadata");
+    }
+    expect(meta.name).toBe("PixAI Tagger v1.0 (INT8)");
+    expect(meta.modelFileName).toBe("model_int8.onnx");
+    expect(meta.configPath).toMatch(/^tagModels-[0-9a-f]{16}-config\.json$/);
+  });
+
+  it("does not misdetect unknown preprocess files", async () => {
+    mockFetchResponse({ stages: [{ type: "normalize" }] });
+    await expect(
+      fetchModelInfo("https://example.com/preprocess.json"),
+    ).rejects.toThrow("Unrecognized model info format.");
   });
 
   it("rejects unknown metadata", async () => {
@@ -164,6 +219,22 @@ describe("fetchModelFiles", () => {
       "https://example.com/pixai/config.json",
       "https://example.com/pixai/model.onnx",
     ]);
+    expect(meta.modelPath).toMatch(/^tagModels-[0-9a-f]{16}-model\.onnx$/);
+  });
+
+  it("fetches the sibling model_int8.onnx for preprocess descriptors", async () => {
+    const requestedUrls = mockPixAIPreprocessFetch();
+    const meta = await fetchModelFiles({
+      name: "PixAI Tagger v1.0 (INT8)",
+      type: "pixai",
+      url: "https://example.com/pixai/preprocess.json",
+    });
+    expect(requestedUrls).toEqual([
+      "https://example.com/pixai/preprocess.json",
+      "https://example.com/pixai/selected_tags.csv",
+      "https://example.com/pixai/model_int8.onnx",
+    ]);
+    expect(meta.name).toBe("PixAI Tagger v1.0 (INT8)");
     expect(meta.modelPath).toMatch(/^tagModels-[0-9a-f]{16}-model\.onnx$/);
   });
 });

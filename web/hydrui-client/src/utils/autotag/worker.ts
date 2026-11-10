@@ -14,6 +14,19 @@ export interface AutotagWorker {
   release(): void;
 }
 
+type SerialQueue = <T>(task: () => Promise<T>) => Promise<T>;
+
+// Run asynchronous tasks one at a time. A rejected task does not stop later
+// tasks from running.
+export function createSerialQueue(): SerialQueue {
+  let tail: Promise<unknown> = Promise.resolve();
+  return <T>(task: () => Promise<T>): Promise<T> => {
+    const result = tail.then(task);
+    tail = result.catch(() => undefined);
+    return result;
+  };
+}
+
 class BackgroundAutotagWorker implements AutotagWorker {
   private worker: Worker;
   private serial = 0;
@@ -26,6 +39,7 @@ class BackgroundAutotagWorker implements AutotagWorker {
     number,
     [(results: Results) => void, (error: Error) => void]
   > = new Map();
+  private enqueueProcessImage = createSerialQueue();
 
   constructor() {
     const worker = new Worker(
@@ -57,20 +71,23 @@ class BackgroundAutotagWorker implements AutotagWorker {
   }
 
   processImage(threshold: number, image: ImageBitmap): Promise<Results> {
-    return new Promise((resolve, reject) => {
-      const serial = this.serial++;
-      this.pendingPromises.set(serial, [resolve, reject]);
-      try {
-        this.postMessage({
-          type: "processImage",
-          threshold,
-          image,
-          serial,
-        });
-      } catch (error) {
-        reject(error);
-      }
-    });
+    return this.enqueueProcessImage(
+      () =>
+        new Promise((resolve, reject) => {
+          const serial = this.serial++;
+          this.pendingPromises.set(serial, [resolve, reject]);
+          try {
+            this.postMessage({
+              type: "processImage",
+              threshold,
+              image,
+              serial,
+            });
+          } catch (error) {
+            reject(error);
+          }
+        }),
+    );
   }
 
   release(): void {
@@ -121,6 +138,7 @@ class BackgroundAutotagWorker implements AutotagWorker {
 class MainThreadAutotagWorker implements AutotagWorker {
   private session?: Session;
   private loadedMeta?: TagModelMeta;
+  private enqueueProcessImage = createSerialQueue();
 
   get backend(): AutotagBackend | null {
     return this.session?.backend ?? null;
@@ -136,23 +154,25 @@ class MainThreadAutotagWorker implements AutotagWorker {
   }
 
   async processImage(threshold: number, image: ImageBitmap): Promise<Results> {
-    const session = this.session;
-    if (!session) {
-      throw new Error("No model loaded!");
-    }
-    try {
-      return await processImage(session, threshold, image);
-    } catch (error) {
-      // WebGPU can fail at inference time even when the session was created
-      // successfully. Reload the same model on the CPU once and retry.
-      if (session.backend !== "webgpu" || !this.loadedMeta) {
-        throw error;
+    return this.enqueueProcessImage(async () => {
+      const session = this.session;
+      if (!session) {
+        throw new Error("No model loaded!");
       }
-      const fallbackSession = await loadModel(this.loadedMeta, false);
-      session.modelSession.release();
-      this.session = fallbackSession;
-      return processImage(fallbackSession, threshold, image);
-    }
+      try {
+        return await processImage(session, threshold, image);
+      } catch (error) {
+        // WebGPU can fail at inference time even when the session was created
+        // successfully. Reload the same model on the CPU once and retry.
+        if (session.backend !== "webgpu" || !this.loadedMeta) {
+          throw error;
+        }
+        const fallbackSession = await loadModel(this.loadedMeta, false);
+        session.modelSession.release();
+        this.session = fallbackSession;
+        return processImage(fallbackSession, threshold, image);
+      }
+    });
   }
 
   release(): void {

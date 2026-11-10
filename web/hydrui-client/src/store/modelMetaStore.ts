@@ -7,6 +7,11 @@ import {
   fetchModelInfo,
   setupZippedTagModel,
 } from "@/utils/autotag/management";
+import {
+  acquireTagModelSession,
+  disposeAllTagModelSessions,
+  disposeTagModelSession,
+} from "@/utils/autotag/modelSession";
 import { type WDTaggerModelInfo } from "@/utils/autotag/wd";
 import {
   type AutotagWorker,
@@ -55,6 +60,8 @@ export interface PixAITaggerModelMeta extends CommonTagModelMeta {
   configPath?: string;
   // Model path in OPFS, if the config is cached
   modelPath?: string;
+  // Sibling model file name to download. Defaults to model.onnx.
+  modelFileName?: string;
 }
 
 export type TagModelMeta =
@@ -136,6 +143,7 @@ export const useModelMetaStore = create<ModelMeta>()(
           if (!prevModel) {
             return;
           }
+          disposeTagModelSession(name);
           const model: TagModelMeta = { ...prevModel };
           await deleteSavedFiles(model);
           delete model.modelPath;
@@ -161,6 +169,9 @@ export const useModelMetaStore = create<ModelMeta>()(
           }
           const model = { ...prevModel };
           const newModel = await fetchModelFiles(model);
+          // The refreshed files may contain different weights, so do not reuse
+          // a session built from the previous files.
+          disposeTagModelSession(name);
           set((state) => ({
             ...state,
             tagModels: {
@@ -188,6 +199,7 @@ export const useModelMetaStore = create<ModelMeta>()(
           if (!model) {
             return;
           }
+          disposeTagModelSession(name);
           await deleteSavedFiles(model);
           set((state) => {
             const newTagModels = { ...state.tagModels };
@@ -201,6 +213,7 @@ export const useModelMetaStore = create<ModelMeta>()(
         },
         async resetTagModels(): Promise<void> {
           const state = get();
+          disposeAllTagModelSessions();
           for (const model of Object.values(state.tagModels)) {
             await deleteSavedFiles(model);
           }
@@ -214,12 +227,12 @@ export const useModelMetaStore = create<ModelMeta>()(
           if (!isModelCached(model)) {
             model = await get().actions.downloadTagModel(name);
           }
-          const worker = await createAutotagWorker();
-          await worker.loadModel(
-            model,
-            usePreferencesStore.getState().useWebGPU,
-          );
-          return worker;
+          const preferWebGPU = usePreferencesStore.getState().useWebGPU;
+          return acquireTagModelSession(name, preferWebGPU, async () => {
+            const worker = await createAutotagWorker();
+            await worker.loadModel(model, preferWebGPU);
+            return worker;
+          });
         },
       },
     }),

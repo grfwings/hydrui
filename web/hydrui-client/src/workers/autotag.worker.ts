@@ -98,8 +98,11 @@ self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
           if (currentSession.backend !== "webgpu" || !loadedMeta) {
             throw error;
           }
-          const fallbackSession = await loadModel(loadedMeta, false);
+          // Release the WebGPU session before loading the CPU one so both
+          // full models are never resident at the same time.
           currentSession.modelSession.release();
+          session = null;
+          const fallbackSession = await loadModel(loadedMeta, false);
           session = fallbackSession;
           results = await processImage(
             fallbackSession,
