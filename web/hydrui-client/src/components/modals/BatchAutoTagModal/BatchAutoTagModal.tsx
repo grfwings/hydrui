@@ -14,12 +14,10 @@ import {
   useModelMetaStore,
 } from "@/store/modelMetaStore";
 import { usePageActions } from "@/store/pageStore";
-import { usePreferencesStore } from "@/store/preferencesStore";
 import { useServices } from "@/store/servicesStore";
 import { useToastActions } from "@/store/toastStore";
 import { useUIStateStore } from "@/store/uiStateStore";
 import { type AutotagBackend } from "@/utils/autotag/common";
-import { releaseTagModelSession } from "@/utils/autotag/modelSession";
 import { type AutotagWorker } from "@/utils/autotag/worker";
 import { isServerMode } from "@/utils/modes";
 
@@ -201,10 +199,7 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
     } finally {
       removeToast(toast);
       // Ensure resources get released.
-      releaseTagModelSession(
-        autotagModel,
-        usePreferencesStore.getState().useWebGPU,
-      );
+      worker.release();
     }
   };
 

@@ -20,14 +20,11 @@ import {
 } from "./haruka";
 import {
   type PixAIModelConfig,
-  type PixAIPreprocessDescriptor,
   deleteSavedPixAIFiles,
   fetchModelFilesPixAI,
   isPixAIConfig,
-  isPixAIPreprocessDescriptor,
   loadPixAIModelFromZip,
   parseModelInfoPixAI,
-  parseModelInfoPixAIFromPreprocess,
 } from "./pixai";
 import {
   type WDTaggerModelInfo,
@@ -67,8 +64,7 @@ export async function fetchModelInfo(url: string): Promise<TagModelMeta> {
     | WDTaggerModelInfo
     | CamieMetadata
     | HarukaMetadata
-    | PixAIModelConfig
-    | PixAIPreprocessDescriptor = await infoResponse.json();
+    | PixAIModelConfig = await infoResponse.json();
   if ("model_info" in info && info?.model_info?.architecture) {
     return parseModelInfoCamie(url, info);
   } else if ("modelname" in info) {
@@ -77,8 +73,6 @@ export async function fetchModelInfo(url: string): Promise<TagModelMeta> {
     return parseModelInfoHaruka(url, info);
   } else if (isPixAIConfig(info)) {
     return parseModelInfoPixAI(url, info);
-  } else if (isPixAIPreprocessDescriptor(info)) {
-    return parseModelInfoPixAIFromPreprocess(url, info);
   } else {
     throw new Error("Unrecognized model info format.");
   }

@@ -84,22 +84,10 @@ export async function createInferenceSession(
       );
     }
   }
-  try {
-    const session = await InferenceSession.create(modelData, {
-      executionProviders: ["wasm"],
-    });
-    return { session, backend: "wasm" };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/aborted/i.test(message)) {
-      throw new Error(
-        `${message}. The model could not be loaded in this browser. ` +
-          "It may use an unsupported format (for example float16 weights) " +
-          "or be too large; try the INT8 export or turn off WebGPU in Settings.",
-      );
-    }
-    throw error;
-  }
+  const session = await InferenceSession.create(modelData, {
+    executionProviders: ["wasm"],
+  });
+  return { session, backend: "wasm" };
 }
 
 export function relativeUrl(urlString: URL | string, path: string): URL {

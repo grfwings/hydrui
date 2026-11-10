@@ -84,9 +84,8 @@ export async function processImage(
       case "refined_predictions": // Camie v2
       case "predictions_sigmoid": // SmilingWolf
       case "logits": // Haruka
-      case "prediction": // PixAI
-      case "probs": {
-        // PixAI float16 exports name their already-sigmoided output "probs".
+      case "prediction": {
+        // PixAI
         const result = results[output.name];
         if (result?.data && result.data instanceof Float32Array) {
           confidences = result.data;

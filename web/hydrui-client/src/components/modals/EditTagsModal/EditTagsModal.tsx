@@ -18,12 +18,10 @@ import {
   useModelMetaStore,
 } from "@/store/modelMetaStore";
 import { usePageActions } from "@/store/pageStore";
-import { usePreferencesStore } from "@/store/preferencesStore";
 import { useServices } from "@/store/servicesStore";
 import { useToastActions } from "@/store/toastStore";
 import { useUIStateStore } from "@/store/uiStateStore";
 import { type AutotagBackend } from "@/utils/autotag/common";
-import { releaseTagModelSession } from "@/utils/autotag/modelSession";
 import { isServerMode } from "@/utils/modes";
 
 import "./index.css";
@@ -419,10 +417,7 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
         );
       } finally {
         // Ensure resources get released.
-        releaseTagModelSession(
-          autotagModel,
-          usePreferencesStore.getState().useWebGPU,
-        );
+        worker.release();
       }
     } catch (e) {
       addToast(`Error processing autotag request: ${e}`, "error");
