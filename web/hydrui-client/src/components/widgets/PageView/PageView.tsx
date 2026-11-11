@@ -940,33 +940,18 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
 
       navigator.vibrate?.(10);
 
-      if (touchSelectionMode) {
-        // A long press in selection mode starts another range drag. Taps are
-        // the way to deselect; keeping this file selected avoids a long press
-        // that both toggles and drags.
-        const currentSelection =
-          usePageStore.getState().selectedFilesByPage[pageKey] ?? [];
-        if (!currentSelection.includes(fileId)) {
-          setSelectedFiles(pageKey, [...currentSelection, fileId], {
-            offerRestore: false,
-          });
-        }
-        setActiveFileId(pageKey, fileId);
-      } else {
+      // The drag hook owns the anchor's selection state: it reads the
+      // selection snapshot from before the press, adds the range when the
+      // anchor was unselected, and removes it when the anchor was selected.
+      if (!touchSelectionMode) {
         setTouchSelectionMode(true);
-        setSelectedFiles(pageKey, [fileId], { offerRestore: false });
-        setActiveFileId(pageKey, fileId);
       }
-      // If the finger keeps moving, fill the rectangle from this thumbnail.
+      setActiveFileId(pageKey, fileId);
+      // If the finger keeps moving, extend the reading-order range from this
+      // thumbnail.
       beginTouchDragSelect(event, fileId);
     },
-    [
-      beginTouchDragSelect,
-      pageKey,
-      setActiveFileId,
-      setSelectedFiles,
-      touchSelectionMode,
-    ],
+    [beginTouchDragSelect, pageKey, setActiveFileId, touchSelectionMode],
   );
 
   const { consumeClickSuppression, ...longPressHandlers } = useLongPress(

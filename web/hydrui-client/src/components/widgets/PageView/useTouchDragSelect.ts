@@ -55,6 +55,8 @@ interface ActiveGesture {
   anchorIndex: number;
   /** Selected page indices when the gesture started, ascending. */
   baseIndices: number[];
+  /** True to add the dragged range, false to remove it. */
+  selects: boolean;
 }
 
 function isTouchOrPen(pointerType: string | undefined): boolean {
@@ -62,78 +64,55 @@ function isTouchOrPen(pointerType: string | undefined): boolean {
 }
 
 /**
- * Every page index inside the rectangle spanning the anchor cell and the
- * current cell, in page order. Rows beyond the last file are clipped, so the
- * result never contains an index past `fileCount - 1`.
+ * Every page index from the anchor to the current cell, inclusive, in page
+ * order. A drag paints a contiguous range in reading order rather than a
+ * geometric rectangle, so moving one cell left along a row changes only that
+ * row's cells. Both indices are clamped to the page, and an empty page yields
+ * an empty range.
  */
-export function getRectangleSelection(
+export function getRangeSelection(
   anchorIndex: number,
   currentIndex: number,
-  columns: number,
   fileCount: number,
 ): number[] {
   if (fileCount <= 0) {
     return [];
   }
 
-  const safeColumns = Math.max(1, Math.floor(columns) || 1);
   const lastIndex = fileCount - 1;
   const clampIndex = (index: number) =>
     Math.min(lastIndex, Math.max(0, Math.floor(index)));
   const anchor = clampIndex(anchorIndex);
   const current = clampIndex(currentIndex);
-
-  const anchorRow = Math.floor(anchor / safeColumns);
-  const anchorColumn = anchor % safeColumns;
-  const currentRow = Math.floor(current / safeColumns);
-  const currentColumn = current % safeColumns;
-
-  const firstRow = Math.min(anchorRow, currentRow);
-  const lastRow = Math.max(anchorRow, currentRow);
-  const firstColumn = Math.min(anchorColumn, currentColumn);
-  const lastColumn = Math.max(anchorColumn, currentColumn);
+  const start = Math.min(anchor, current);
+  const end = Math.max(anchor, current);
 
   const indices: number[] = [];
-  for (let row = firstRow; row <= lastRow; row += 1) {
-    for (let column = firstColumn; column <= lastColumn; column += 1) {
-      const index = row * safeColumns + column;
-      if (index <= lastIndex) {
-        indices.push(index);
-      }
-    }
+  for (let index = start; index <= end; index += 1) {
+    indices.push(index);
   }
   return indices;
 }
 
-/** Merge two ascending index lists, dropping duplicates. */
-function mergeSortedIndices(
-  first: readonly number[],
-  second: readonly number[],
+/**
+ * The base selection with the dragged range inserted or removed, ascending.
+ * Everything outside the range keeps its pre-gesture state, so shrinking the
+ * range restores what the drag had changed.
+ */
+function applyRangeToIndices(
+  baseIndices: readonly number[],
+  range: readonly number[],
+  selects: boolean,
 ): number[] {
-  const merged: number[] = [];
-  let i = 0;
-  let j = 0;
-
-  while (i < first.length || j < second.length) {
-    const firstValue = i < first.length ? first[i] : undefined;
-    const secondValue = j < second.length ? second[j] : undefined;
-
-    if (
-      secondValue === undefined ||
-      (firstValue !== undefined && firstValue < secondValue)
-    ) {
-      merged.push(firstValue!);
-      i += 1;
-    } else if (firstValue === undefined || secondValue < firstValue) {
-      merged.push(secondValue);
-      j += 1;
+  const next = new Set(baseIndices);
+  for (const index of range) {
+    if (selects) {
+      next.add(index);
     } else {
-      merged.push(secondValue);
-      i += 1;
-      j += 1;
+      next.delete(index);
     }
   }
-  return merged;
+  return [...next].sort((a, b) => a - b);
 }
 
 /**
@@ -207,12 +186,17 @@ export function getEdgeScrollSpeed(
 }
 
 /**
- * Selects the filled rectangle spanning the long-pressed thumbnail and the
- * grid cell under the pointer. Painting starts once the pointer moves past
- * `moveThreshold`, blocks the gesture's native touch scrolling, and
- * auto-scrolls the grid while the finger rests near an edge. Releasing ends
- * painting but keeps selection mode; taps and mouse drag selection are
- * unaffected.
+ * Selects or deselects the reading-order range spanning the long-pressed
+ * thumbnail and the grid cell under the pointer. The mode is chosen from the
+ * selection at press time: pressing an unselected file adds the range, while
+ * pressing a selected file removes it. The base selection is snapshotted
+ * before the press, so dragging back shrinks the range and restores each item
+ * to its pre-gesture state.
+ *
+ * Painting starts once the pointer moves past `moveThreshold`, blocks the
+ * gesture's native touch scrolling, and auto-scrolls the grid while the finger
+ * rests near an edge. Releasing ends painting but keeps selection mode; taps
+ * and mouse drag selection are unaffected.
  */
 export default function useTouchDragSelect({
   pageKey,
@@ -252,6 +236,8 @@ export default function useTouchDragSelect({
         return;
       }
 
+      // Snapshot the selection before the anchor changes so the drag can
+      // restore items as the range shrinks.
       const baseIndexSet = new Set<number>();
       for (const fileId of state.selectedFilesByPage[pageKey] ?? []) {
         const index = state.fileIdToIndex.get(fileId);
@@ -259,14 +245,31 @@ export default function useTouchDragSelect({
           baseIndexSet.add(index);
         }
       }
-      baseIndexSet.add(anchorIndex);
+      const baseIndices = [...baseIndexSet].sort((a, b) => a - b);
+      const selects = !baseIndexSet.has(anchorIndex);
 
       setGesture({
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
         anchorIndex,
-        baseIndices: [...baseIndexSet].sort((a, b) => a - b),
+        baseIndices,
+        selects,
+      });
+
+      // Apply the single-cell range at press time. A selected anchor is
+      // removed immediately, which matches a tap; an unselected anchor is
+      // added.
+      const nextIndices = applyRangeToIndices(
+        baseIndices,
+        [anchorIndex],
+        selects,
+      );
+      const nextSelection = nextIndices
+        .map((index) => state.fileIds[index])
+        .filter((fileId): fileId is number => fileId !== undefined);
+      state.actions.setSelectedFiles(pageKey, nextSelection, {
+        offerRestore: false,
       });
     },
     [canPaintNow, pageKey],
@@ -308,15 +311,15 @@ export default function useTouchDragSelect({
         return;
       }
 
-      const rectangle = getRectangleSelection(
+      const range = getRangeSelection(
         gesture.anchorIndex,
         currentIndex,
-        metrics.columns,
         fileCount,
       );
-      const selectedIndices = mergeSortedIndices(
+      const selectedIndices = applyRangeToIndices(
         gesture.baseIndices,
-        rectangle,
+        range,
+        gesture.selects,
       );
       const nextSelection = selectedIndices
         .map((index) => state.fileIds[index])
@@ -395,7 +398,7 @@ export default function useTouchDragSelect({
       }
 
       grid.scrollTop = nextScrollTop;
-      // Rows that scrolled under the stationary finger join the rectangle.
+      // Rows that scrolled under the stationary finger join the range.
       paintAt(lastX, lastY);
       frameId = requestAnimationFrame(autoScrollTick);
     };

@@ -269,6 +269,22 @@ function getFileItem(fileId: number) {
   return screen.getByRole("button", { name: `File ${fileId}` });
 }
 
+// Centre of a cell in the pinned three-column grid, in client coordinates.
+function cellPoint(index: number) {
+  return {
+    clientX: 74 + 116 * (index % 3),
+    clientY: 74 + 116 * Math.floor(index / 3),
+  };
+}
+
+function fileIdsFor(...indices: number[]) {
+  return indices.map((index) => index + 1);
+}
+
+function indexRange(start: number, end: number) {
+  return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
+}
+
 function selection() {
   return usePageStore.getState().selectedFilesByPage["test"] ?? [];
 }
@@ -434,7 +450,7 @@ describe("PageView touch interactions", () => {
     expect(screen.queryByRole("toolbar")).toBeNull();
   });
 
-  it("paints the rectangle spanned by the long press and the pointer", () => {
+  it("paints the reading-order range spanned by the long press and the pointer", () => {
     vi.useFakeTimers();
     render(<PageView pageKey="test" />);
     const first = getFileItem(1);
@@ -469,7 +485,7 @@ describe("PageView touch interactions", () => {
     ).toBeInTheDocument();
     expect(usePageStore.getState().activeFileByPage["test"]).toBe(2);
 
-    // Dragging back to the anchor shrinks the rectangle to the base selection.
+    // Dragging back to the anchor shrinks the range to the base selection.
     dispatchPointer(first, "pointermove", {
       pointerType: "touch",
       clientX: 100,
@@ -508,7 +524,7 @@ describe("PageView touch interactions", () => {
     expect(selection()).toEqual([1, 2, 3]);
   });
 
-  it("selects the filled rectangle across rows and shrinks it again", () => {
+  it("selects the reading-order range across rows and shrinks it again", () => {
     vi.useFakeTimers();
     resetPageStore(Array.from({ length: 12 }, (_, index) => index + 1));
     render(<PageView pageKey="test" />);
@@ -516,8 +532,7 @@ describe("PageView touch interactions", () => {
 
     dispatchPointer(anchor, "pointerdown", {
       pointerType: "touch",
-      clientX: 74,
-      clientY: 74,
+      ...cellPoint(0),
     });
     act(() => {
       vi.advanceTimersByTime(500);
@@ -527,32 +542,29 @@ describe("PageView touch interactions", () => {
     // One cell to the right, same row.
     dispatchPointer(anchor, "pointermove", {
       pointerType: "touch",
-      clientX: 190,
-      clientY: 74,
+      ...cellPoint(1),
     });
     expect(selection()).toEqual([1, 2]);
 
-    // Two rows down in the same column. The middle row is filled even though
-    // the pointer never crossed it.
+    // Two rows down in the middle column. Every cell in reading order between
+    // the anchor and the pointer is filled, including the middle row.
     dispatchPointer(anchor, "pointermove", {
       pointerType: "touch",
-      clientX: 190,
-      clientY: 306,
+      ...cellPoint(7),
     });
-    expect(selection()).toEqual([1, 2, 4, 5, 7, 8]);
+    expect(selection()).toEqual(fileIdsFor(...indexRange(0, 7)));
     expect(document.querySelectorAll(".file-item-touch-selected")).toHaveLength(
-      6,
+      8,
     );
     expect(
-      within(screen.getByRole("toolbar")).getByText("6 selected"),
+      within(screen.getByRole("toolbar")).getByText("8 selected"),
     ).toBeInTheDocument();
     expect(usePageStore.getState().activeFileByPage["test"]).toBe(8);
 
-    // Dragging back to the anchor removes the rectangle-only cells.
+    // Dragging back to the anchor removes the range-only cells.
     dispatchPointer(anchor, "pointermove", {
       pointerType: "touch",
-      clientX: 74,
-      clientY: 74,
+      ...cellPoint(0),
     });
     expect(selection()).toEqual([1]);
     expect(document.querySelectorAll(".file-item-touch-selected")).toHaveLength(
@@ -564,12 +576,11 @@ describe("PageView touch interactions", () => {
 
     dispatchPointer(anchor, "pointerup", {
       pointerType: "touch",
-      clientX: 74,
-      clientY: 74,
+      ...cellPoint(0),
     });
   });
 
-  it("starts another rectangle from a long press while already in selection mode", () => {
+  it("starts another range drag from a long press while already in selection mode", () => {
     vi.useFakeTimers();
     resetPageStore(Array.from({ length: 12 }, (_, index) => index + 1));
     render(<PageView pageKey="test" />);
@@ -578,38 +589,234 @@ describe("PageView touch interactions", () => {
     const first = getFileItem(1);
     dispatchPointer(first, "pointerdown", {
       pointerType: "touch",
-      clientX: 74,
-      clientY: 74,
+      ...cellPoint(0),
     });
     act(() => {
       vi.advanceTimersByTime(500);
     });
     dispatchPointer(first, "pointerup", {
       pointerType: "touch",
-      clientX: 74,
-      clientY: 74,
+      ...cellPoint(0),
     });
     expect(selection()).toEqual([1]);
 
-    // A second long press keeps file 4 selected and arms a new drag.
+    // A second long press on the unselected file 4 adds it and arms a drag.
     const second = getFileItem(4);
     dispatchPointer(second, "pointerdown", {
       pointerType: "touch",
-      clientX: 74,
-      clientY: 190,
+      ...cellPoint(3),
     });
     act(() => {
       vi.advanceTimersByTime(500);
     });
     expect(selection()).toEqual([1, 4]);
 
-    // Drag to the next row and column: the 2x2 block is filled.
+    // Drag to the next row and column: the reading-order range 3..7 is added.
     dispatchPointer(second, "pointermove", {
       pointerType: "touch",
-      clientX: 190,
-      clientY: 306,
+      ...cellPoint(7),
     });
-    expect(selection()).toEqual([1, 4, 5, 7, 8]);
+    expect(selection()).toEqual([1, 4, 5, 6, 7, 8]);
+  });
+
+  it("keeps the rest of the last row selected when a select drag moves back one cell", () => {
+    vi.useFakeTimers();
+    resetPageStore(Array.from({ length: 12 }, (_, index) => index + 1));
+    render(<PageView pageKey="test" />);
+    const anchor = getFileItem(1);
+
+    dispatchPointer(anchor, "pointerdown", {
+      pointerType: "touch",
+      ...cellPoint(0),
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(selection()).toEqual([1]);
+
+    // Drag across the whole page: all twelve cells are selected.
+    dispatchPointer(anchor, "pointermove", {
+      pointerType: "touch",
+      ...cellPoint(11),
+    });
+    expect(selection()).toEqual(fileIdsFor(...indexRange(0, 11)));
+    expect(document.querySelectorAll(".file-item-touch-selected")).toHaveLength(
+      12,
+    );
+
+    // One cell back along the last row must drop only index 11, not the whole
+    // right column the old rectangle selected.
+    dispatchPointer(anchor, "pointermove", {
+      pointerType: "touch",
+      ...cellPoint(10),
+    });
+    expect(selection()).toEqual(fileIdsFor(...indexRange(0, 10)));
+    expect(document.querySelectorAll(".file-item-touch-selected")).toHaveLength(
+      11,
+    );
+    expect(
+      within(screen.getByRole("toolbar")).getByText("11 selected"),
+    ).toBeInTheDocument();
+    expect(usePageStore.getState().activeFileByPage["test"]).toBe(11);
+
+    dispatchPointer(anchor, "pointerup", {
+      pointerType: "touch",
+      ...cellPoint(10),
+    });
+    expect(selection()).toEqual(fileIdsFor(...indexRange(0, 10)));
+  });
+
+  it("deselects the reading-order range from a long press on a selected cell", () => {
+    vi.useFakeTimers();
+    resetPageStore(Array.from({ length: 12 }, (_, index) => index + 1));
+    render(<PageView pageKey="test" />);
+
+    // Select the whole page with a drag and lift.
+    const anchor = getFileItem(1);
+    dispatchPointer(anchor, "pointerdown", {
+      pointerType: "touch",
+      ...cellPoint(0),
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    dispatchPointer(anchor, "pointermove", {
+      pointerType: "touch",
+      ...cellPoint(11),
+    });
+    dispatchPointer(anchor, "pointerup", {
+      pointerType: "touch",
+      ...cellPoint(11),
+    });
+    expect(selection()).toEqual(fileIdsFor(...indexRange(0, 11)));
+
+    // Long press the selected index 5. The anchor is removed at press time.
+    const selected = getFileItem(6);
+    dispatchPointer(selected, "pointerdown", {
+      pointerType: "touch",
+      ...cellPoint(5),
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(selection()).toEqual(fileIdsFor(0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11));
+
+    // Dragging to index 8 removes the reading-order range 5..8, and leaves
+    // every other cell selected.
+    dispatchPointer(selected, "pointermove", {
+      pointerType: "touch",
+      ...cellPoint(8),
+    });
+    expect(selection()).toEqual(fileIdsFor(0, 1, 2, 3, 4, 9, 10, 11));
+    expect(document.querySelectorAll(".file-item-touch-selected")).toHaveLength(
+      8,
+    );
+    expect(usePageStore.getState().activeFileByPage["test"]).toBe(9);
+
+    // Shrinking the range restores the cells the drag had removed.
+    dispatchPointer(selected, "pointermove", {
+      pointerType: "touch",
+      ...cellPoint(6),
+    });
+    expect(selection()).toEqual(fileIdsFor(0, 1, 2, 3, 4, 7, 8, 9, 10, 11));
+
+    dispatchPointer(selected, "pointerup", {
+      pointerType: "touch",
+      ...cellPoint(6),
+    });
+  });
+
+  it("adds the range from a long press on an unselected cell in selection mode", () => {
+    vi.useFakeTimers();
+    resetPageStore(Array.from({ length: 12 }, (_, index) => index + 1));
+    render(<PageView pageKey="test" />);
+
+    // Enter selection mode on file 1 and release.
+    const first = getFileItem(1);
+    dispatchPointer(first, "pointerdown", {
+      pointerType: "touch",
+      ...cellPoint(0),
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    dispatchPointer(first, "pointerup", {
+      pointerType: "touch",
+      ...cellPoint(0),
+    });
+    expect(selection()).toEqual([1]);
+
+    // Long press the unselected index 4: only the anchor is added first.
+    const unselected = getFileItem(5);
+    dispatchPointer(unselected, "pointerdown", {
+      pointerType: "touch",
+      ...cellPoint(4),
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(selection()).toEqual([1, 5]);
+
+    // Dragging to index 6 adds the reading-order range 4..6.
+    dispatchPointer(unselected, "pointermove", {
+      pointerType: "touch",
+      ...cellPoint(6),
+    });
+    expect(selection()).toEqual([1, 5, 6, 7]);
+
+    dispatchPointer(unselected, "pointerup", {
+      pointerType: "touch",
+      ...cellPoint(6),
+    });
+  });
+
+  it("deselects a stationary selected long press and selects a stationary unselected one", () => {
+    vi.useFakeTimers();
+    resetPageStore(Array.from({ length: 12 }, (_, index) => index + 1));
+    render(<PageView pageKey="test" />);
+
+    const first = getFileItem(1);
+    dispatchPointer(first, "pointerdown", {
+      pointerType: "touch",
+      ...cellPoint(0),
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    dispatchPointer(first, "pointerup", {
+      pointerType: "touch",
+      ...cellPoint(0),
+    });
+    expect(selection()).toEqual([1]);
+
+    // A stationary press on the unselected file 3 selects only it.
+    const third = getFileItem(3);
+    dispatchPointer(third, "pointerdown", {
+      pointerType: "touch",
+      ...cellPoint(2),
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    dispatchPointer(third, "pointerup", {
+      pointerType: "touch",
+      ...cellPoint(2),
+    });
+    expect(selection()).toEqual([1, 3]);
+
+    // Pressing the now selected file 3 deselects only it.
+    dispatchPointer(third, "pointerdown", {
+      pointerType: "touch",
+      ...cellPoint(2),
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    dispatchPointer(third, "pointerup", {
+      pointerType: "touch",
+      ...cellPoint(2),
+    });
+    expect(selection()).toEqual([1]);
   });
 
   it("stops painting when the pointer is cancelled", () => {
