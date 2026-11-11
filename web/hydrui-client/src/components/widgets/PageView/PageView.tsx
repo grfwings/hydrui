@@ -212,10 +212,16 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
     modalOpenRef.current = inModal;
   }, [inModal]);
   const canPaintTouchDragSelect = useCallback(() => !modalOpenRef.current, []);
+
+  // Keep the grid geometry current without re-registering the drag listeners.
+  const gridMetricsRef = useRef<GridMetrics | null>(null);
+  const getTouchDragGridMetrics = useCallback(() => gridMetricsRef.current, []);
+
   const { begin: beginTouchDragSelect } = useTouchDragSelect({
     pageKey,
     gridRef,
     canPaint: canPaintTouchDragSelect,
+    getGridMetrics: getTouchDragGridMetrics,
   });
 
   const [renderView, setRenderView] = useState({
@@ -547,6 +553,9 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
   const [gridMetrics, setGridMetrics] = useState<GridMetrics>(() =>
     computeGridMetrics(0, fileIds.length, thumbnailSize, false),
   );
+  useEffect(() => {
+    gridMetricsRef.current = gridMetrics;
+  }, [gridMetrics]);
 
   // Touch-specific selection mode. Mouse users keep the existing behaviour and
   // never enter this mode.
@@ -932,22 +941,30 @@ const PageViewImpl: React.FC<PageViewProps> = ({ pageKey }) => {
       navigator.vibrate?.(10);
 
       if (touchSelectionMode) {
-        toggleTouchSelection(fileId);
-        return;
+        // A long press in selection mode starts another range drag. Taps are
+        // the way to deselect; keeping this file selected avoids a long press
+        // that both toggles and drags.
+        const currentSelection =
+          usePageStore.getState().selectedFilesByPage[pageKey] ?? [];
+        if (!currentSelection.includes(fileId)) {
+          setSelectedFiles(pageKey, [...currentSelection, fileId], {
+            offerRestore: false,
+          });
+        }
+        setActiveFileId(pageKey, fileId);
+      } else {
+        setTouchSelectionMode(true);
+        setSelectedFiles(pageKey, [fileId], { offerRestore: false });
+        setActiveFileId(pageKey, fileId);
       }
-
-      setTouchSelectionMode(true);
-      setSelectedFiles(pageKey, [fileId], { offerRestore: false });
-      setActiveFileId(pageKey, fileId);
-      // If the finger keeps moving, paint the thumbnails it passes over.
-      beginTouchDragSelect(event);
+      // If the finger keeps moving, fill the rectangle from this thumbnail.
+      beginTouchDragSelect(event, fileId);
     },
     [
       beginTouchDragSelect,
       pageKey,
       setActiveFileId,
       setSelectedFiles,
-      toggleTouchSelection,
       touchSelectionMode,
     ],
   );

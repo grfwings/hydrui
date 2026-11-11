@@ -162,6 +162,18 @@ vi.mock("@/file/renderers", () => ({
   renderDispatch: () => ({}),
 }));
 
+// jsdom has no layout. Pin the grid width so geometry-driven selection sees a
+// realistic three-column grid instead of the zero-width single column.
+vi.mock("./gridMetrics", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./gridMetrics")>();
+  return {
+    ...actual,
+    computeGridMetrics: (
+      ...args: Parameters<typeof actual.computeGridMetrics>
+    ) => actual.computeGridMetrics(448, args[1], args[2], args[3]),
+  };
+});
+
 vi.mock("@/components/modals/FileViewerModal/FileViewerModal", () => ({
   default: ({ fileId }: { fileId: number }) => {
     viewerState.calls += 1;
@@ -215,15 +227,24 @@ vi.mock("@/components/modals/TokenPassingModal/TokenPassingModal", () => ({
   default: () => null,
 }));
 
-// jsdom has no layout, so `document.elementFromPoint` does not exist. The
-// drag gesture hit-tests through this narrow seam; each test maps pointer
-// coordinates onto the rendered file items.
-const elementFromPointMock = vi.fn<(x: number, y: number) => Element | null>();
-Object.defineProperty(document, "elementFromPoint", {
-  configurable: true,
-  writable: true,
-  value: elementFromPointMock,
-});
+// With the pinned 448px grid, cells are 100px with a 16px gap and 16px
+// padding, so cell centers sit at 74 + 116 * column/row.
+const DEFAULT_FILE_IDS = [1, 2, 3, 4, 5, 6];
+
+function resetPageStore(fileIds: number[] = DEFAULT_FILE_IDS) {
+  usePageStore.setState({
+    fileIds,
+    fileIdToIndex: new Map(fileIds.map((fileId, index) => [fileId, index])),
+    loadedFiles: fileIds.map((fileId) => ({
+      file_id: fileId,
+      hash: `hash-${fileId}`,
+      is_local: true,
+      is_trashed: false,
+    })),
+    selectedFilesByPage: {},
+    activeFileByPage: {},
+  });
+}
 
 function dispatchPointer(
   target: Element,
@@ -248,15 +269,6 @@ function getFileItem(fileId: number) {
   return screen.getByRole("button", { name: `File ${fileId}` });
 }
 
-// File 1 occupies x=100, file 2 x=200, and so on.
-function hitTestFileAt(clientX: number): Element | null {
-  const fileId = Math.round(clientX / 100);
-  if (fileId < 1 || fileId > 6) {
-    return null;
-  }
-  return getFileItem(fileId);
-}
-
 function selection() {
   return usePageStore.getState().selectedFilesByPage["test"] ?? [];
 }
@@ -266,12 +278,7 @@ describe("PageView touch interactions", () => {
     viewerState.calls = 0;
     viewerState.fileId = null;
     filterState.fileIds = [];
-    elementFromPointMock.mockReset();
-    elementFromPointMock.mockImplementation((x) => hitTestFileAt(x));
-    usePageStore.setState({
-      selectedFilesByPage: {},
-      activeFileByPage: {},
-    });
+    resetPageStore();
     useContextMenuStore.getState().actions.closeMenu();
   });
 
@@ -427,7 +434,7 @@ describe("PageView touch interactions", () => {
     expect(screen.queryByRole("toolbar")).toBeNull();
   });
 
-  it("paints thumbnails passed over after a long press without deselecting", () => {
+  it("paints the rectangle spanned by the long press and the pointer", () => {
     vi.useFakeTimers();
     render(<PageView pageKey="test" />);
     const first = getFileItem(1);
@@ -462,13 +469,13 @@ describe("PageView touch interactions", () => {
     ).toBeInTheDocument();
     expect(usePageStore.getState().activeFileByPage["test"]).toBe(2);
 
-    // Dragging back over an already selected file keeps it selected.
+    // Dragging back to the anchor shrinks the rectangle to the base selection.
     dispatchPointer(first, "pointermove", {
       pointerType: "touch",
       clientX: 100,
       clientY: 10,
     });
-    expect(selection()).toEqual([1, 2]);
+    expect(selection()).toEqual([1]);
     expect(usePageStore.getState().activeFileByPage["test"]).toBe(1);
 
     dispatchPointer(first, "pointermove", {
@@ -499,6 +506,110 @@ describe("PageView touch interactions", () => {
       clientY: 10,
     });
     expect(selection()).toEqual([1, 2, 3]);
+  });
+
+  it("selects the filled rectangle across rows and shrinks it again", () => {
+    vi.useFakeTimers();
+    resetPageStore(Array.from({ length: 12 }, (_, index) => index + 1));
+    render(<PageView pageKey="test" />);
+    const anchor = getFileItem(1);
+
+    dispatchPointer(anchor, "pointerdown", {
+      pointerType: "touch",
+      clientX: 74,
+      clientY: 74,
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(selection()).toEqual([1]);
+
+    // One cell to the right, same row.
+    dispatchPointer(anchor, "pointermove", {
+      pointerType: "touch",
+      clientX: 190,
+      clientY: 74,
+    });
+    expect(selection()).toEqual([1, 2]);
+
+    // Two rows down in the same column. The middle row is filled even though
+    // the pointer never crossed it.
+    dispatchPointer(anchor, "pointermove", {
+      pointerType: "touch",
+      clientX: 190,
+      clientY: 306,
+    });
+    expect(selection()).toEqual([1, 2, 4, 5, 7, 8]);
+    expect(document.querySelectorAll(".file-item-touch-selected")).toHaveLength(
+      6,
+    );
+    expect(
+      within(screen.getByRole("toolbar")).getByText("6 selected"),
+    ).toBeInTheDocument();
+    expect(usePageStore.getState().activeFileByPage["test"]).toBe(8);
+
+    // Dragging back to the anchor removes the rectangle-only cells.
+    dispatchPointer(anchor, "pointermove", {
+      pointerType: "touch",
+      clientX: 74,
+      clientY: 74,
+    });
+    expect(selection()).toEqual([1]);
+    expect(document.querySelectorAll(".file-item-touch-selected")).toHaveLength(
+      1,
+    );
+    expect(
+      within(screen.getByRole("toolbar")).getByText("1 selected"),
+    ).toBeInTheDocument();
+
+    dispatchPointer(anchor, "pointerup", {
+      pointerType: "touch",
+      clientX: 74,
+      clientY: 74,
+    });
+  });
+
+  it("starts another rectangle from a long press while already in selection mode", () => {
+    vi.useFakeTimers();
+    resetPageStore(Array.from({ length: 12 }, (_, index) => index + 1));
+    render(<PageView pageKey="test" />);
+
+    // Enter selection mode on the first file and release.
+    const first = getFileItem(1);
+    dispatchPointer(first, "pointerdown", {
+      pointerType: "touch",
+      clientX: 74,
+      clientY: 74,
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    dispatchPointer(first, "pointerup", {
+      pointerType: "touch",
+      clientX: 74,
+      clientY: 74,
+    });
+    expect(selection()).toEqual([1]);
+
+    // A second long press keeps file 4 selected and arms a new drag.
+    const second = getFileItem(4);
+    dispatchPointer(second, "pointerdown", {
+      pointerType: "touch",
+      clientX: 74,
+      clientY: 190,
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(selection()).toEqual([1, 4]);
+
+    // Drag to the next row and column: the 2x2 block is filled.
+    dispatchPointer(second, "pointermove", {
+      pointerType: "touch",
+      clientX: 190,
+      clientY: 306,
+    });
+    expect(selection()).toEqual([1, 4, 5, 7, 8]);
   });
 
   it("stops painting when the pointer is cancelled", () => {
@@ -660,16 +771,7 @@ describe("PageView Archive/Delete filter scope", () => {
   beforeEach(() => {
     filterState.fileIds = [];
     filterState.excludedCount = 0;
-    usePageStore.setState({
-      selectedFilesByPage: {},
-      activeFileByPage: {},
-      loadedFiles: [1, 2, 3, 4, 5, 6].map((fileId) => ({
-        file_id: fileId,
-        hash: `hash-${fileId}`,
-        is_local: true,
-        is_trashed: false,
-      })),
-    });
+    resetPageStore();
     useContextMenuStore.getState().actions.closeMenu();
   });
 
