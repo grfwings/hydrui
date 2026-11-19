@@ -322,9 +322,17 @@
   margin-bottom: 1rem;
 }
 
-.edit-tags-modal-autotag-form-row label {
+.edit-tags-modal-autotag-form-row > label {
   min-width: 120px;
   color: var(--color-gray-300);
+}
+
+.edit-tags-modal-autotag-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-gray-300);
+  font-size: 0.875rem;
 }
 
 .edit-tags-modal-autotag-form-control {

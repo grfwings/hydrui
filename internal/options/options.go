@@ -39,6 +39,10 @@ type Values struct {
 	LLMAPIKey      string
 	LLMModel       string
 	LLMName        string
+	RoostURL       string
+	RoostSecure    bool
+	RoostAPIKey    string
+	RoostName      string
 	HtpasswdFile   string
 	UseACME        bool
 	ACMEEmail      string
@@ -55,10 +59,11 @@ type Values struct {
 
 func NewDefault() *Values {
 	return &Values{
-		Listen:    ":8080",
-		Secure:    true,
-		LLMSecure: true,
-		ACMEURL:   acme.LetsEncryptURL,
+		Listen:      ":8080",
+		Secure:      true,
+		LLMSecure:   true,
+		RoostSecure: true,
+		ACMEURL:     acme.LetsEncryptURL,
 
 		AllowBugReport: true,
 	}
@@ -93,6 +98,10 @@ func (v *Values) ParseFlags(args []string) error {
 	SecretVar(set, &v.LLMAPIKey, "llm-api-key", v.LLMAPIKey, "Language model provider API key")
 	set.StringVar(&v.LLMModel, "llm-model", v.LLMModel, "Language model used for server-side model requests")
 	set.StringVar(&v.LLMName, "llm-name", v.LLMName, "Display name for the server-configured language model provider")
+	set.StringVar(&v.RoostURL, "roost-url", v.RoostURL, "Roost tagging API server URL (server mode only)")
+	set.BoolVar(&v.RoostSecure, "roost-secure", v.RoostSecure, "Enable validating the TLS certificate of the Roost server")
+	SecretVar(set, &v.RoostAPIKey, "roost-api-key", v.RoostAPIKey, "Roost server API token")
+	set.StringVar(&v.RoostName, "roost-name", v.RoostName, "Display name for the server-configured Roost model")
 	set.StringVar(&v.HtpasswdFile, "htpasswd", v.HtpasswdFile, "Path to htpasswd file for authentication")
 	set.BoolVar(&v.UseACME, "acme", v.UseACME, "Enable ACME, acquire TLS certificate")
 	set.StringVar(&v.ACMEEmail, "acme-email", v.ACMEEmail, "E-mail address to use for ACME account")
@@ -146,6 +155,10 @@ func (v *Values) ParseEnv() {
 	stringEnv(&v.LLMAPIKey, "HYDRUI_LLM_API_KEY")
 	stringEnv(&v.LLMModel, "HYDRUI_LLM_MODEL")
 	stringEnv(&v.LLMName, "HYDRUI_LLM_NAME")
+	stringEnv(&v.RoostURL, "HYDRUI_ROOST_URL")
+	boolEnv(&v.RoostSecure, "HYDRUI_ROOST_SECURE")
+	stringEnv(&v.RoostAPIKey, "HYDRUI_ROOST_API_KEY")
+	stringEnv(&v.RoostName, "HYDRUI_ROOST_NAME")
 	stringEnv(&v.HtpasswdFile, "HYDRUI_HTPASSWD")
 	boolEnv(&v.UseACME, "HYDRUI_ACME")
 	stringEnv(&v.ACMEEmail, "HYDRUI_ACME_EMAIL")
@@ -177,6 +190,10 @@ func (v *Values) ServerConfig(ctx context.Context, log *slog.Logger) (server.Con
 		LLMAPIKey:      strings.TrimSpace(v.LLMAPIKey),
 		LLMModel:       strings.TrimSpace(v.LLMModel),
 		LLMName:        strings.TrimSpace(v.LLMName),
+		RoostURL:       strings.TrimRight(strings.TrimSpace(v.RoostURL), "/"),
+		RoostSecure:    v.RoostSecure,
+		RoostAPIKey:    strings.TrimSpace(v.RoostAPIKey),
+		RoostName:      strings.TrimSpace(v.RoostName),
 		Secure:         v.Secure,
 		ServerMode:     v.ServerMode,
 		NoAuth:         v.NoAuth,
@@ -220,6 +237,20 @@ func (v *Values) ServerConfig(ctx context.Context, log *slog.Logger) (server.Con
 			}
 			if result.LLMName == "" {
 				result.LLMName = "Server Language Model"
+			}
+		}
+
+		roostConfigured := result.RoostURL != "" || result.RoostAPIKey != "" || result.RoostName != ""
+		if roostConfigured {
+			if result.RoostURL == "" {
+				return server.Config{}, fmt.Errorf("roost server URL is required when roost options are configured")
+			}
+			roostURL, err := url.Parse(result.RoostURL)
+			if err != nil || (roostURL.Scheme != "http" && roostURL.Scheme != "https") || roostURL.Host == "" {
+				return server.Config{}, fmt.Errorf("invalid roost server URL %q", result.RoostURL)
+			}
+			if result.RoostName == "" {
+				result.RoostName = "Roost (Server)"
 			}
 		}
 
@@ -279,6 +310,10 @@ func (v *Values) ServerConfig(ctx context.Context, log *slog.Logger) (server.Con
 	} else {
 		if v.LLMURL != "" || v.LLMAPIKey != "" || v.LLMModel != "" || v.LLMName != "" {
 			log.LogAttrs(ctx, slog.LevelWarn, "Language model server options are not used in client-only mode.")
+		}
+
+		if v.RoostURL != "" || v.RoostAPIKey != "" || v.RoostName != "" {
+			log.LogAttrs(ctx, slog.LevelWarn, "Roost server options are not used in client-only mode.")
 		}
 
 		if v.HydrusURL != "" {

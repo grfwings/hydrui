@@ -346,6 +346,16 @@ func runMainWindow(ctx context.Context) {
 									checkboxField(tr("Validate Provider TLS Certificate"), &newOpts.LLMSecure),
 								},
 							},
+							GroupBox{
+								Title:  tr("Roost Tagging Model (Server Mode)"),
+								Layout: VBox{},
+								Children: []Widget{
+									textField(tr("Display Name"), &newOpts.RoostName),
+									textField(tr("Roost URL"), &newOpts.RoostURL),
+									textField(tr("Roost API Token"), &newOpts.RoostAPIKey),
+									checkboxField(tr("Validate Roost TLS Certificate"), &newOpts.RoostSecure),
+								},
+							},
 							VSpacer{},
 						},
 					},

@@ -98,9 +98,17 @@
   margin-bottom: 1rem;
 }
 
-.batch-autotag-modal-form-row label {
+.batch-autotag-modal-form-row > label {
   min-width: 120px;
   color: var(--color-gray-300);
+}
+
+.batch-autotag-modal-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-gray-300);
+  font-size: 0.875rem;
 }
 
 .batch-autotag-modal-form-control {

@@ -34,7 +34,9 @@ import { useSearchStore } from "@/store/searchStore";
 import { useToastActions } from "@/store/toastStore";
 import { isServerMode } from "@/utils/modes";
 
-import AddTagModelModal from "../AddTagModelModal/AddTagModelModal";
+import AddTagModelModal, {
+  type AddTagModelMode,
+} from "../AddTagModelModal/AddTagModelModal";
 import SetViewerOverrideModal from "../SetViewerOverrideModal/SetViewerOverrideModal";
 import "./index.css";
 
@@ -47,7 +49,8 @@ type TabType = "general" | "pageview" | "fileview" | "models";
 function SettingsModal({ onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>("general");
   const [editingColor, setEditingColor] = useState<string | boolean>();
-  const [showAddTagsModelModal, setShowAddTagsModelModal] = useState(false);
+  const [addTagsModelMode, setAddTagsModelMode] =
+    useState<AddTagModelMode | null>(null);
   const [editingViewerOverrideFileType, setEditingViewerOverrideFileType] =
     useState<HydrusFileType>();
   const [
@@ -193,7 +196,7 @@ function SettingsModal({ onClose }: SettingsModalProps) {
                     )}
                   >
                     <ModelsManager
-                      setShowAddTagsModelModal={setShowAddTagsModelModal}
+                      setShowAddTagsModelModal={setAddTagsModelMode}
                     />
                   </ErrorBoundary>
                   <ErrorBoundary
@@ -226,8 +229,11 @@ function SettingsModal({ onClose }: SettingsModalProps) {
         )}
 
         {/* Add tag model modal */}
-        {showAddTagsModelModal ? (
-          <AddTagModelModal onClose={() => setShowAddTagsModelModal(false)} />
+        {addTagsModelMode ? (
+          <AddTagModelModal
+            mode={addTagsModelMode}
+            onClose={() => setAddTagsModelMode(null)}
+          />
         ) : undefined}
 
         {/* Set viewer override modal */}
@@ -781,7 +787,7 @@ function ColorSwatch({
 }
 
 interface ModelsManagerProps {
-  setShowAddTagsModelModal: (show: boolean) => void;
+  setShowAddTagsModelModal: (mode: AddTagModelMode) => void;
 }
 
 function ModelsManager({ setShowAddTagsModelModal }: ModelsManagerProps) {
@@ -894,9 +900,9 @@ function ModelsManager({ setShowAddTagsModelModal }: ModelsManagerProps) {
         <legend>Tagging Models</legend>
         <p>
           Hydrui can suggest tags for images using tagging models that run
-          locally in your web browser. Please note that model weights are
-          generally large, so using this feature will use some bandwidth and
-          disk space.
+          locally in your web browser or via a Roost API server. Please note
+          that local model weights are generally large, so running models in the
+          browser will use some bandwidth and disk space.
         </p>
         {isServerMode ? (
           <p>
@@ -952,61 +958,79 @@ function ModelsManager({ setShowAddTagsModelModal }: ModelsManagerProps) {
             </div>
           </div>
           <div className="settings-model-rows">
-            {tagModelNames.map((name) => (
-              <div className="settings-model-row" key={name}>
-                <div className="settings-model-row-name">
-                  <CircleStackIcon width="24" height="24"></CircleStackIcon>
-                  {name}
-                  {tagModels[name]?.url
-                    ? tagModels[name].modelPath
-                      ? " (cached)"
-                      : " (not cached)"
-                    : " (local)"}
-                </div>
-                <div className="settings-model-row-right">
-                  {tagModels[name]?.url ? (
-                    tagModels[name].modelPath ? (
+            {tagModelNames.map((name) => {
+              const model = tagModels[name];
+              return (
+                <div className="settings-model-row" key={name}>
+                  <div className="settings-model-row-name">
+                    <CircleStackIcon width="24" height="24"></CircleStackIcon>
+                    {name}
+                    {model?.type === "roost"
+                      ? model.serverManaged
+                        ? " (server)"
+                        : ` (${model.url})`
+                      : model?.url
+                        ? model.modelPath
+                          ? " (cached)"
+                          : " (not cached)"
+                        : " (local)"}
+                  </div>
+                  <div className="settings-model-row-right">
+                    {model && model.type !== "roost" && model.url ? (
+                      model.modelPath ? (
+                        <button
+                          onClick={() => clearFiles(name)}
+                          className="settings-model-row-clear-button"
+                          title="Clear all cached files"
+                          disabled={isLoading}
+                        >
+                          <TrashIcon />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => download(name)}
+                          className="settings-model-row-download-button"
+                          title="Download model into cache"
+                          disabled={isLoading || isServerMode}
+                        >
+                          <ArrowDownTrayIcon />
+                        </button>
+                      )
+                    ) : undefined}
+
+                    {model?.type === "roost" &&
+                    model.serverManaged ? undefined : (
                       <button
-                        onClick={() => clearFiles(name)}
-                        className="settings-model-row-clear-button"
-                        title="Clear all cached files"
+                        onClick={() => uninstall(name)}
+                        className="settings-model-row-remove-button"
+                        title="Remove model"
                         disabled={isLoading}
                       >
-                        <TrashIcon />
+                        <MinusIcon />
                       </button>
-                    ) : (
-                      <button
-                        onClick={() => download(name)}
-                        className="settings-model-row-download-button"
-                        title="Download model into cache"
-                        disabled={isLoading || isServerMode}
-                      >
-                        <ArrowDownTrayIcon />
-                      </button>
-                    )
-                  ) : undefined}
-
-                  <button
-                    onClick={() => uninstall(name)}
-                    className="settings-model-row-remove-button"
-                    title="Remove model"
-                    disabled={isLoading}
-                  >
-                    <MinusIcon />
-                  </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         <div className="settings-model-actions">
           {isServerMode ? undefined : (
-            <PushButton
-              onClick={() => setShowAddTagsModelModal(true)}
-              disabled={isLoading}
-            >
-              Add by URL...
-            </PushButton>
+            <>
+              <PushButton
+                onClick={() => setShowAddTagsModelModal("url")}
+                disabled={isLoading}
+              >
+                Add by URL...
+              </PushButton>
+              <PushButton
+                onClick={() => setShowAddTagsModelModal("roost")}
+                disabled={isLoading}
+              >
+                Add Roost API...
+              </PushButton>
+            </>
           )}
           <PushButton
             onClick={() => {

@@ -9,7 +9,7 @@ import { REAL_TAG_SERVICES } from "@/constants/services";
 import { renderDispatch } from "@/file/renderers";
 import { useShortcut } from "@/hooks/useShortcut";
 import { client } from "@/store/apiStore";
-import { useModelMetaStore } from "@/store/modelMetaStore";
+import { isModelCached, useModelMetaStore } from "@/store/modelMetaStore";
 import { usePageActions } from "@/store/pageStore";
 import { useServices } from "@/store/servicesStore";
 import { useToastActions } from "@/store/toastStore";
@@ -33,13 +33,20 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
   const {
     autotagModel,
     autotagThreshold,
-    actions: { setLastActiveTagService, setAutotagModel, setAutotagThreshold },
+    autotagOverrideThreshold,
+    actions: {
+      setLastActiveTagService,
+      setAutotagModel,
+      setAutotagThreshold,
+      setAutotagOverrideThreshold,
+    },
   } = useUIStateStore();
   const {
     tagModels,
     tagModelNames,
     actions: { loadTagModel },
   } = useModelMetaStore();
+  const isRoostModel = tagModels[autotagModel]?.type === "roost";
   const { addToast, removeToast, updateToastProgress } = useToastActions();
   const [activeServiceKey, setActiveServiceKey] = useState<string | null>(null);
 
@@ -54,8 +61,23 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
 
   useEffect(() => {
     // If the autotag model is not set or set to something invalid, try to set it to something valid.
-    if (!autotagModel || !tagModels[autotagModel]) {
-      setAutotagModel(tagModelNames[0] ?? "");
+    // In server mode, also switch away from an uncached default model if a cached/server model exists.
+    const currentModel = autotagModel ? tagModels[autotagModel] : undefined;
+    const fallbackName =
+      tagModelNames.find((name) => {
+        const meta = tagModels[name];
+        return meta ? Boolean(isModelCached(meta)) : false;
+      }) ??
+      tagModelNames[0] ??
+      "";
+    if (
+      !currentModel ||
+      (isServerMode &&
+        !isModelCached(currentModel) &&
+        fallbackName &&
+        fallbackName !== autotagModel)
+    ) {
+      setAutotagModel(fallbackName);
     }
     // Set initial active service to last used service or first available
     if (!activeServiceKey && tagServices.length > 0) {
@@ -94,6 +116,8 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
       addToast("No service key set for batch autotag.", "error");
       return;
     }
+    const effectiveThreshold =
+      isRoostModel && !autotagOverrideThreshold ? null : autotagThreshold;
     let cancelled = false;
     let abortController: AbortController | null = null;
     if (typeof AbortController !== "undefined") {
@@ -130,16 +154,21 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
           break;
         }
         updateToastProgress(toast, (i++ * 100) / files.length);
-        const requestInit: RequestInit = {};
-        if (abortController) {
-          requestInit.signal = abortController.signal;
-        }
         const renderer = renderDispatch(file);
         const bitmap = await renderer.rasterize(
           new URL(client.getFileUrl(file.file_id), document.URL),
           { ...file },
         );
-        const result = await worker.processImage(autotagThreshold, bitmap);
+        let result;
+        try {
+          result = await worker.processImage(
+            effectiveThreshold,
+            bitmap,
+            abortController?.signal,
+          );
+        } finally {
+          bitmap.close?.();
+        }
         const existingTags = new Set<string>();
         let hasRating = false;
         const serviceTags =
@@ -178,12 +207,16 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
           refreshFileMetadata([file.file_id]);
         }
       }
-      addToast(
-        `Batch autotag finished: ${added} tags added (${existing} already set).`,
-        "success",
-      );
+      if (!cancelled) {
+        addToast(
+          `Batch autotag finished: ${added} tags added (${existing} already set).`,
+          "success",
+        );
+      }
     } catch (e) {
-      addToast(`Error processing autotag request: ${e}`, "error");
+      if (!cancelled) {
+        addToast(`Error processing autotag request: ${e}`, "error");
+      }
     } finally {
       removeToast(toast);
       // Ensure resources get released.
@@ -221,7 +254,9 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
                     <b>Note:</b> Autotagging is experimental.
                   </p>
                 </div>
-                {isServerMode ? (
+                {isServerMode &&
+                (!tagModels[autotagModel] ||
+                  !isModelCached(tagModels[autotagModel])) ? (
                   <div className="batch-autotag-modal-form-row">
                     <p>
                       <b>
@@ -272,29 +307,45 @@ const BatchAutoTagModal: React.FC<BatchAutoTagModalProps> = ({
                 <div className="batch-autotag-modal-form-row">
                   <label>Threshold</label>
                   <div className="batch-autotag-modal-form-control">
-                    <input
-                      className="batch-autotag-modal-number-input"
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={autotagThreshold}
-                      onChange={(e) =>
-                        setAutotagThreshold(Number(e.currentTarget.value))
-                      }
-                      inputMode="decimal"
-                    />
-                    <input
-                      className="batch-autotag-modal-range-input"
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={autotagThreshold}
-                      onChange={(e) =>
-                        setAutotagThreshold(Number(e.currentTarget.value))
-                      }
-                    />
+                    {isRoostModel && (
+                      <label className="batch-autotag-modal-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={autotagOverrideThreshold}
+                          onChange={(e) =>
+                            setAutotagOverrideThreshold(e.currentTarget.checked)
+                          }
+                        />
+                        Override default general threshold
+                      </label>
+                    )}
+                    {(!isRoostModel || autotagOverrideThreshold) && (
+                      <>
+                        <input
+                          className="batch-autotag-modal-number-input"
+                          type="number"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={autotagThreshold}
+                          onChange={(e) =>
+                            setAutotagThreshold(Number(e.currentTarget.value))
+                          }
+                          inputMode="decimal"
+                        />
+                        <input
+                          className="batch-autotag-modal-range-input"
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={autotagThreshold}
+                          onChange={(e) =>
+                            setAutotagThreshold(Number(e.currentTarget.value))
+                          }
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

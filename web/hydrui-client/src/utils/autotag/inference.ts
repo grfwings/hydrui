@@ -98,6 +98,8 @@ export async function loadModel(meta: TagModelMeta): Promise<Session> {
       return loadModelWD(meta);
     case "camie":
       return loadModelCamie(meta);
+    case "roost":
+      throw new Error("Roost API models do not use the local ONNX runtime.");
   }
 }
 

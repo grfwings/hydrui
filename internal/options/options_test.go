@@ -49,3 +49,32 @@ func TestServerConfigRequiresModelForLanguageModelProvider(t *testing.T) {
 	)
 	assert.EqualError(t, err, "language model is required when a language model provider URL is configured")
 }
+
+func TestServerConfigIncludesRoostProvider(t *testing.T) {
+	t.Parallel()
+	values := serverModeValues()
+	values.RoostURL = "https://roost.example/"
+	values.RoostAPIKey = " roost-key "
+
+	config, err := values.ServerConfig(
+		context.Background(),
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "https://roost.example", config.RoostURL)
+	assert.Equal(t, "roost-key", config.RoostAPIKey)
+	assert.Equal(t, "Roost (Server)", config.RoostName)
+	assert.True(t, config.RoostSecure)
+}
+
+func TestServerConfigRequiresURLForRoostProvider(t *testing.T) {
+	t.Parallel()
+	values := serverModeValues()
+	values.RoostAPIKey = "roost-key"
+
+	_, err := values.ServerConfig(
+		context.Background(),
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	assert.EqualError(t, err, "roost server URL is required when roost options are configured")
+}

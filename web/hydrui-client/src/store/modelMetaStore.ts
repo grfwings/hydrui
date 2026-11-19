@@ -7,6 +7,12 @@ import {
   fetchModelInfo,
   setupZippedTagModel,
 } from "@/utils/autotag/management";
+import {
+  RoostAutotagWorker,
+  fetchRoostModelInfo,
+  normalizeRoostBaseUrl,
+  serverRoostModel,
+} from "@/utils/autotag/roost";
 import { type WDTaggerModelInfo } from "@/utils/autotag/wd";
 import {
   type AutotagWorker,
@@ -40,7 +46,20 @@ export interface CamieTaggerModelMeta extends CommonTagModelMeta {
   modelPath?: string;
 }
 
-export type TagModelMeta = WDTaggerModelMeta | CamieTaggerModelMeta;
+export interface RoostTagModelMeta extends CommonTagModelMeta {
+  type: "roost";
+  // Base URL of the Roost server.
+  url: string;
+  // Optional Bearer token for Roost authentication.
+  apiKey?: string;
+  // True when configured via hydrui-server in server mode.
+  serverManaged?: boolean;
+}
+
+export type TagModelMeta =
+  | WDTaggerModelMeta
+  | CamieTaggerModelMeta
+  | RoostTagModelMeta;
 
 interface ModelMeta {
   tagModels: Record<string, TagModelMeta>;
@@ -49,6 +68,11 @@ interface ModelMeta {
   actions: {
     installTagModelFromUrl: (url: string) => Promise<void>;
     installTagModelFromBlob: (blob: Blob) => Promise<void>;
+    installRoostTagModel: (options: {
+      url: string;
+      name?: string;
+      apiKey?: string;
+    }) => Promise<RoostTagModelMeta>;
     clearInstalledFiles: (name: string) => Promise<void>;
     downloadTagModel: (name: string) => Promise<TagModelMeta>;
     addTagModel: (meta: TagModelMeta) => void;
@@ -58,7 +82,32 @@ interface ModelMeta {
   };
 }
 
-const INITIAL_STATE: Omit<ModelMeta, "actions"> = {
+export function withServerRoostModel(
+  state: Pick<ModelMeta, "tagModels" | "tagModelNames">,
+  serverModel: RoostTagModelMeta | null,
+): Pick<ModelMeta, "tagModels" | "tagModelNames"> {
+  const tagModels: Record<string, TagModelMeta> = {};
+  for (const [name, meta] of Object.entries(state.tagModels)) {
+    if (meta.type === "roost" && meta.serverManaged) {
+      continue;
+    }
+    tagModels[name] = meta;
+  }
+  const tagModelNames = state.tagModelNames.filter((name) => name in tagModels);
+  if (!serverModel) {
+    return { tagModels, tagModelNames };
+  }
+  tagModels[serverModel.name] = serverModel;
+  return {
+    tagModels,
+    tagModelNames: [
+      serverModel.name,
+      ...tagModelNames.filter((name) => name !== serverModel.name),
+    ],
+  };
+}
+
+const DEFAULT_BROWSER_STATE: Pick<ModelMeta, "tagModels" | "tagModelNames"> = {
   tagModels: {
     "WD ViT Tagger v3": {
       name: "WD ViT Tagger v3",
@@ -69,12 +118,19 @@ const INITIAL_STATE: Omit<ModelMeta, "actions"> = {
   tagModelNames: ["WD ViT Tagger v3"],
 };
 
+const INITIAL_STATE: Omit<ModelMeta, "actions"> = withServerRoostModel(
+  DEFAULT_BROWSER_STATE,
+  serverRoostModel,
+);
+
 export function isModelCached(meta: TagModelMeta) {
   switch (meta.type) {
     case "wd":
       return meta.info && meta.tagsPath && meta.modelPath;
     case "camie":
       return meta.metadataPath && meta.modelPath;
+    case "roost":
+      return true;
   }
 }
 
@@ -95,9 +151,27 @@ export const useModelMetaStore = create<ModelMeta>()(
         async installTagModelFromBlob(blob: Blob): Promise<void> {
           get().actions.addTagModel(await setupZippedTagModel(blob));
         },
+        async installRoostTagModel(options: {
+          url: string;
+          name?: string;
+          apiKey?: string;
+        }): Promise<RoostTagModelMeta> {
+          const url = normalizeRoostBaseUrl(options.url);
+          const apiKey = options.apiKey?.trim() || undefined;
+          const info = await fetchRoostModelInfo(url, apiKey);
+          const name = options.name?.trim() || info.id;
+          const meta: RoostTagModelMeta = {
+            type: "roost",
+            name,
+            url,
+            ...(apiKey ? { apiKey } : {}),
+          };
+          get().actions.addTagModel(meta);
+          return meta;
+        },
         async clearInstalledFiles(name: string): Promise<void> {
           const prevModel = get().tagModels[name];
-          if (!prevModel) {
+          if (!prevModel || prevModel.type === "roost") {
             return;
           }
           const model: TagModelMeta = { ...prevModel };
@@ -117,6 +191,9 @@ export const useModelMetaStore = create<ModelMeta>()(
           const prevModel = get().tagModels[name];
           if (!prevModel) {
             throw new Error(`Model ${name} not found.`);
+          }
+          if (prevModel.type === "roost") {
+            return prevModel;
           }
           const model = { ...prevModel };
           const newModel = await fetchModelFiles(model);
@@ -144,7 +221,7 @@ export const useModelMetaStore = create<ModelMeta>()(
         },
         async uninstallTagModel(name: string): Promise<void> {
           const model = get().tagModels[name];
-          if (!model) {
+          if (!model || (model.type === "roost" && model.serverManaged)) {
             return;
           }
           await deleteSavedFiles(model);
@@ -170,6 +247,9 @@ export const useModelMetaStore = create<ModelMeta>()(
           if (!model) {
             throw new Error(`Model ${name} not found`);
           }
+          if (model.type === "roost") {
+            return new RoostAutotagWorker(model);
+          }
           if (!isModelCached(model)) {
             model = await get().actions.downloadTagModel(name);
           }
@@ -183,11 +263,25 @@ export const useModelMetaStore = create<ModelMeta>()(
       name: "hydrui-model-meta",
       version: 1,
       storage: jsonStorage,
-      // Only persist specific keys
-      partialize: ({ tagModels, tagModelNames }) => ({
-        tagModels,
-        tagModelNames,
-      }),
+      // Only persist non-server-managed models
+      partialize: ({ tagModels, tagModelNames }) =>
+        withServerRoostModel({ tagModels, tagModelNames }, null),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<
+          Pick<ModelMeta, "tagModels" | "tagModelNames">
+        >;
+        return {
+          ...currentState,
+          ...withServerRoostModel(
+            {
+              tagModels: persisted.tagModels ?? currentState.tagModels,
+              tagModelNames:
+                persisted.tagModelNames ?? currentState.tagModelNames,
+            },
+            serverRoostModel,
+          ),
+        };
+      },
       migrate: (persistedState: unknown, version: number) => {
         if (version === 0) {
           // v0 did not contain the type field.

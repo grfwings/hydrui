@@ -33,6 +33,9 @@ export async function fetchModelInfo(url: string): Promise<TagModelMeta> {
 export async function fetchModelFiles(
   meta: TagModelMeta,
 ): Promise<TagModelMeta> {
+  if (meta.type === "roost") {
+    return meta;
+  }
   if (!meta.url) {
     throw new Error("Model entry does not have a URL!");
   }
@@ -40,7 +43,11 @@ export async function fetchModelFiles(
     throw new Error("Origin Private File System is not available!");
   }
   const opfsRoot = await navigator.storage.getDirectory();
-  meta = await fetchModelInfo(meta.url);
+  const fetched = await fetchModelInfo(meta.url);
+  if (fetched.type === "roost") {
+    return fetched;
+  }
+  meta = fetched;
   const cacheKey = await getCacheKey(meta.name);
   if (!meta.url) {
     throw new Error("Inconsistent state: URL missing in fetched model");
@@ -73,6 +80,9 @@ export async function fetchModelFiles(
 }
 
 export async function deleteSavedFiles(meta: TagModelMeta) {
+  if (meta.type === "roost") {
+    return;
+  }
   if (!navigator.storage || !navigator.storage.getDirectory) {
     throw new Error("Origin Private File System is not available!");
   }

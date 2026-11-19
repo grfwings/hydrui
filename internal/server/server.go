@@ -43,6 +43,8 @@ type TemplateData struct {
 	LLMEnabled   bool
 	LLMName      string
 	LLMModel     string
+	RoostEnabled bool
+	RoostName    string
 }
 
 // LoginRequest represents the JSON request for login
@@ -144,6 +146,10 @@ type Config struct {
 	LLMAPIKey      string
 	LLMModel       string
 	LLMName        string
+	RoostURL       string
+	RoostSecure    bool
+	RoostAPIKey    string
+	RoostName      string
 	HtpasswdFile   *HtpasswdFile
 	Secure         bool
 	ServerMode     bool
@@ -210,6 +216,8 @@ func New(config Config, clientData *pack.Pack) *Server {
 		LLMEnabled:   config.ServerMode && config.LLMURL != "",
 		LLMName:      config.LLMName,
 		LLMModel:     config.LLMModel,
+		RoostEnabled: config.ServerMode && config.RoostURL != "",
+		RoostName:    config.RoostName,
 	}
 
 	proxyClient := &http.Client{
@@ -223,6 +231,10 @@ func New(config Config, clientData *pack.Pack) *Server {
 	if config.ServerMode {
 		if config.LLMURL != "" {
 			externalMux.Handle("/llm/", requireSession(config, newLLMProxy(config)))
+		}
+
+		if config.RoostURL != "" {
+			externalMux.Handle("/roost/", requireSession(config, newRoostProxy(config)))
 		}
 
 		if config.AllowBugReport {

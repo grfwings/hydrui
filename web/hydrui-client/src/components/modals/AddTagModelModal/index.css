@@ -49,6 +49,20 @@
   gap: 0.5rem;
 }
 
+.add-tag-model-modal-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.add-tag-model-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--color-gray-300);
+}
+
 .add-tag-model-modal-url-input {
   flex: 1;
   padding: 0.5rem;

@@ -9,7 +9,11 @@ import { type Session, loadModel, processImage } from "./inference";
 
 export interface AutotagWorker {
   loadModel(meta: TagModelMeta): Promise<void>;
-  processImage(threshold: number, image: ImageBitmap): Promise<Results>;
+  processImage(
+    threshold: number | null,
+    image: ImageBitmap,
+    signal?: AbortSignal,
+  ): Promise<Results>;
   release(): void;
 }
 
@@ -44,14 +48,14 @@ class BackgroundAutotagWorker implements AutotagWorker {
     });
   }
 
-  processImage(threshold: number, image: ImageBitmap): Promise<Results> {
+  processImage(threshold: number | null, image: ImageBitmap): Promise<Results> {
     return new Promise((resolve, reject) => {
       const serial = this.serial++;
       this.pendingPromises.set(serial, [resolve, reject]);
       try {
         this.postMessage({
           type: "processImage",
-          threshold,
+          threshold: threshold ?? 0.85,
           image,
           serial,
         });
@@ -111,11 +115,14 @@ class MainThreadAutotagWorker implements AutotagWorker {
     this.session = await loadModel(meta);
   }
 
-  async processImage(threshold: number, image: ImageBitmap): Promise<Results> {
+  async processImage(
+    threshold: number | null,
+    image: ImageBitmap,
+  ): Promise<Results> {
     if (!this.session) {
       throw new Error("No model loaded!");
     }
-    return processImage(this.session, threshold, image);
+    return processImage(this.session, threshold ?? 0.85, image);
   }
 
   release(): void {

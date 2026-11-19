@@ -13,7 +13,7 @@ import { REAL_TAG_SERVICES } from "@/constants/services";
 import { renderDispatch } from "@/file/renderers";
 import { useShortcut } from "@/hooks/useShortcut";
 import { client } from "@/store/apiStore";
-import { useModelMetaStore } from "@/store/modelMetaStore";
+import { isModelCached, useModelMetaStore } from "@/store/modelMetaStore";
 import { usePageActions } from "@/store/pageStore";
 import { useServices } from "@/store/servicesStore";
 import { useToastActions } from "@/store/toastStore";
@@ -49,13 +49,20 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
   const {
     autotagModel,
     autotagThreshold,
-    actions: { setLastActiveTagService, setAutotagModel, setAutotagThreshold },
+    autotagOverrideThreshold,
+    actions: {
+      setLastActiveTagService,
+      setAutotagModel,
+      setAutotagThreshold,
+      setAutotagOverrideThreshold,
+    },
   } = useUIStateStore();
   const {
     tagModels,
     tagModelNames,
     actions: { loadTagModel },
   } = useModelMetaStore();
+  const isRoostModel = tagModels[autotagModel]?.type === "roost";
   const { addToast, removeToast } = useToastActions();
   const [activeServiceKey, setActiveServiceKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("edit");
@@ -81,8 +88,23 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
 
   useEffect(() => {
     // If the autotag model is not set or set to something invalid, try to set it to something valid.
-    if (!autotagModel || !tagModels[autotagModel]) {
-      setAutotagModel(tagModelNames[0] ?? "");
+    // In server mode, also switch away from an uncached default model if a cached/server model exists.
+    const currentModel = autotagModel ? tagModels[autotagModel] : undefined;
+    const fallbackName =
+      tagModelNames.find((name) => {
+        const meta = tagModels[name];
+        return meta ? Boolean(isModelCached(meta)) : false;
+      }) ??
+      tagModelNames[0] ??
+      "";
+    if (
+      !currentModel ||
+      (isServerMode &&
+        !isModelCached(currentModel) &&
+        fallbackName &&
+        fallbackName !== autotagModel)
+    ) {
+      setAutotagModel(fallbackName);
     }
     // Set initial active service to last used service or first available
     if (!activeServiceKey && tagServices.length > 0) {
@@ -367,45 +389,51 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
       duration: false,
     });
     try {
+      const effectiveThreshold =
+        isRoostModel && !autotagOverrideThreshold ? null : autotagThreshold;
       const renderer = renderDispatch(file);
       const bitmap = await renderer.rasterize(
         new URL(client.getFileUrl(file.file_id), document.URL),
         { ...file },
       );
-      const worker = await loadTagModel(autotagModel);
-      let existing = 0;
       try {
-        const result = await worker.processImage(autotagThreshold, bitmap);
-        const existingTags = new Set<string>();
-        let hasRating = false;
-        if (activeServiceKey && tagCountsByService[activeServiceKey]) {
-          for (const tag of tagCountsByService[activeServiceKey]) {
-            if (tag.value.startsWith("rating:")) {
-              hasRating = true;
+        const worker = await loadTagModel(autotagModel);
+        let existing = 0;
+        try {
+          const result = await worker.processImage(effectiveThreshold, bitmap);
+          const existingTags = new Set<string>();
+          let hasRating = false;
+          if (activeServiceKey && tagCountsByService[activeServiceKey]) {
+            for (const tag of tagCountsByService[activeServiceKey]) {
+              if (tag.value.startsWith("rating:")) {
+                hasRating = true;
+              }
+              if (tag.count === tag.total) {
+                existingTags.add(tag.value);
+              }
             }
-            if (tag.count === tag.total) {
-              existingTags.add(tag.value);
+          }
+          for (const tag of result.tagResults) {
+            if (tag.name.startsWith("rating:") && hasRating) {
+              existing++;
+              continue;
+            }
+            if (!existingTags.has(tag.name)) {
+              handleAddTag(tag.name);
+            } else {
+              existing++;
             }
           }
+          addToast(
+            `Autotag request succeeded: ${result.tagResults.length} tags found (${existing} already set).`,
+            "success",
+          );
+        } finally {
+          // Ensure resources get released.
+          worker.release();
         }
-        for (const tag of result.tagResults) {
-          if (tag.name.startsWith("rating:") && hasRating) {
-            existing++;
-            continue;
-          }
-          if (!existingTags.has(tag.name)) {
-            handleAddTag(tag.name);
-          } else {
-            existing++;
-          }
-        }
-        addToast(
-          `Autotag request succeeded: ${result.tagResults.length} tags found (${existing} already set).`,
-          "success",
-        );
       } finally {
-        // Ensure resources get released.
-        worker.release();
+        bitmap.close?.();
       }
     } catch (e) {
       addToast(`Error processing autotag request: ${e}`, "error");
@@ -594,7 +622,9 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
                       detection.
                     </p>
                   </div>
-                  {isServerMode ? (
+                  {isServerMode &&
+                  (!tagModels[autotagModel] ||
+                    !isModelCached(tagModels[autotagModel])) ? (
                     <div className="edit-tags-modal-autotag-form-row">
                       <p>
                         <b>
@@ -645,28 +675,47 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ files, onClose }) => {
                   <div className="edit-tags-modal-autotag-form-row">
                     <label>Threshold</label>
                     <div className="edit-tags-modal-autotag-form-control">
-                      <input
-                        className="edit-tags-modal-autotag-number-input"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={autotagThreshold}
-                        onChange={(e) =>
-                          setAutotagThreshold(Number(e.currentTarget.value))
-                        }
-                      />
-                      <input
-                        className="edit-tags-modal-autotag-range-input"
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={autotagThreshold}
-                        onChange={(e) =>
-                          setAutotagThreshold(Number(e.currentTarget.value))
-                        }
-                      />
+                      {isRoostModel && (
+                        <label className="edit-tags-modal-autotag-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={autotagOverrideThreshold}
+                            onChange={(e) =>
+                              setAutotagOverrideThreshold(
+                                e.currentTarget.checked,
+                              )
+                            }
+                          />
+                          Override default general threshold
+                        </label>
+                      )}
+                      {(!isRoostModel || autotagOverrideThreshold) && (
+                        <>
+                          <input
+                            className="edit-tags-modal-autotag-number-input"
+                            type="number"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={autotagThreshold}
+                            onChange={(e) =>
+                              setAutotagThreshold(Number(e.currentTarget.value))
+                            }
+                            inputMode="decimal"
+                          />
+                          <input
+                            className="edit-tags-modal-autotag-range-input"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={autotagThreshold}
+                            onChange={(e) =>
+                              setAutotagThreshold(Number(e.currentTarget.value))
+                            }
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="edit-tags-modal-autotag-form-row">

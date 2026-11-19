@@ -13,6 +13,7 @@ interface UIState {
 
   // Autotag threshold
   autotagThreshold: number;
+  autotagOverrideThreshold: boolean;
 
   // Sidebar positioning
   sidebarWidthPercent: number;
@@ -35,6 +36,7 @@ interface UIState {
     getScrollPosition: (pageKey: string) => number;
     setAutotagModel: (model: string) => void;
     setAutotagThreshold: (threshold: number) => void;
+    setAutotagOverrideThreshold: (override: boolean) => void;
     setSidebarWidthPercent: (value: number) => void;
     setSidebarHidden: (value: boolean) => void;
     setTagListHeightPercent: (value: number) => void;
@@ -63,6 +65,7 @@ export const useUIStateStore = create<UIState>()(
       scrollLocks: {},
       autotagModel: "",
       autotagThreshold: 0.85,
+      autotagOverrideThreshold: false,
       sidebarWidthPercent: 25,
       sidebarHidden: false,
       tagListHeightPercent: 50,
@@ -94,6 +97,10 @@ export const useUIStateStore = create<UIState>()(
 
         setAutotagThreshold(threshold: number) {
           set({ autotagThreshold: threshold });
+        },
+
+        setAutotagOverrideThreshold(override: boolean) {
+          set({ autotagOverrideThreshold: override });
         },
 
         setSidebarWidthPercent(value: number) {
@@ -199,6 +206,7 @@ export const useUIStateStore = create<UIState>()(
         scrollPositions: state.scrollPositions,
         autotagModel: state.autotagModel,
         autotagThreshold: state.autotagThreshold,
+        autotagOverrideThreshold: state.autotagOverrideThreshold,
         sidebarWidthPercent: state.sidebarWidthPercent,
         sidebarHidden: state.sidebarHidden,
         tagListHeightPercent: state.tagListHeightPercent,
